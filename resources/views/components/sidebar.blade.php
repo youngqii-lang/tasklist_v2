@@ -2,9 +2,12 @@
     $account = auth()->user()->loadMissing(['role', 'division']);
     $appName = config('app.name');
     $appNameWords = preg_split('/\s+/', trim($appName));
-    $appInitials = count($appNameWords) > 1
-        ? mb_substr($appNameWords[0], 0, 1).mb_substr($appNameWords[1], 0, 1)
-        : mb_substr($appName, 0, 2);
+    preg_match_all('/\p{Lu}/u', $appName, $appNameCapitals);
+    $appInitials = match (true) {
+        count($appNameWords) > 1 => mb_substr($appNameWords[0], 0, 1).mb_substr($appNameWords[1], 0, 1),
+        count($appNameCapitals[0]) > 1 => $appNameCapitals[0][0].$appNameCapitals[0][1],
+        default => mb_substr($appName, 0, 2),
+    };
 @endphp
 
 <aside
@@ -12,7 +15,7 @@
     class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col bg-burgundy-900 text-burgundy-50 shadow-2xl shadow-black/30 transition-transform duration-200 lg:translate-x-0 lg:shadow-none"
 >
     <div class="flex items-center gap-3 px-6 pt-7 pb-6">
-        <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-burgundy-600 text-lg font-bold text-white uppercase shadow-lg shadow-black/25 ring-1 ring-burgundy-400/40">
+        <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#0c5963] text-lg font-bold text-white uppercase shadow-lg shadow-black/25 ring-1 ring-white/15">
             {{ $appInitials }}
         </div>
         <div class="min-w-0">
