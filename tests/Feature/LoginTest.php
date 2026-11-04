@@ -85,6 +85,20 @@ class LoginTest extends TestCase
             ->assertSee('Tanpa Divisi');
     }
 
+    public function test_sidebar_shows_navigation_and_active_account(): void
+    {
+        $account = Account::factory()->create(['username' => 'budi']);
+
+        $this->actingAs($account)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('href="'.route('dashboard').'"', false)
+            ->assertSee('aria-current="page"', false)
+            ->assertSee('action="'.route('logout').'"', false)
+            ->assertSee('Akun Aktif')
+            ->assertSee('@budi');
+    }
+
     public function test_account_can_logout(): void
     {
         $account = Account::factory()->create();
