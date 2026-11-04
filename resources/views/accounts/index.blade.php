@@ -1,22 +1,19 @@
-@extends('layouts.dashboard', ['title' => 'Manajemen Akun'])
+@extends('layouts.dashboard', ['title' => 'Organization Management · Akun'])
 
 @section('page')
     <div class="mx-auto max-w-5xl">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-semibold text-burgundy-900">Manajemen Akun</h1>
-                <p class="mt-1 text-sm text-slate-500">Daftar akun yang terdaftar di aplikasi.</p>
-            </div>
-
+        <x-organization-header description="Daftar akun yang terdaftar di aplikasi.">
             @can('create', App\Models\Account::class)
-                <a href="{{ route('accounts.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-burgundy-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-burgundy-700 focus:outline-none focus:ring-2 focus:ring-burgundy-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    Tambah Akun
-                </a>
+                <x-slot:action>
+                    <a href="{{ route('accounts.create') }}" class="inline-flex items-center gap-2 rounded-lg bg-burgundy-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-burgundy-700 focus:outline-none focus:ring-2 focus:ring-burgundy-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Tambah Akun
+                    </a>
+                </x-slot:action>
             @endcan
-        </div>
+        </x-organization-header>
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <x-stat-card label="Total Accounts" :value="$totalAccounts">
