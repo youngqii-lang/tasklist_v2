@@ -41,6 +41,23 @@ class AccountManagementTest extends TestCase
         }
     }
 
+    public function test_account_list_shows_total_and_per_role_count_cards(): void
+    {
+        $viewer = Account::factory()->manager()->create();
+        Account::factory()->manager()->count(2)->create();
+        Account::factory()->employee()->count(4)->create();
+
+        $response = $this->actingAs($viewer)->get(route('accounts.index'))->assertOk();
+
+        $this->assertSame(7, $response->viewData('totalAccounts'));
+        $this->assertSame(
+            ['Employee' => 4, 'Manager' => 3],
+            $response->viewData('roles')->pluck('accounts_count', 'name')->all(),
+        );
+
+        $response->assertSeeInOrder(['Total Accounts', '7', 'Employee Accounts', '4', 'Manager Accounts', '3']);
+    }
+
     public function test_division_filter_lists_divisions_from_database_with_all_divisions_default(): void
     {
         Division::factory()->create(['name' => 'Pemasaran']);

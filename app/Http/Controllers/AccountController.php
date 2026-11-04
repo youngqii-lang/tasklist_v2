@@ -32,6 +32,8 @@ class AccountController extends Controller
             ->withQueryString();
 
         return view('accounts.index', [
+            'totalAccounts' => Account::count(),
+            'roles' => Role::withCount('accounts')->orderBy('name')->get(),
             'accounts' => $accounts,
             'divisions' => $divisions,
             'selectedDivisionId' => $selectedDivisionId,
