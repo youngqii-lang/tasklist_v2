@@ -6,4 +6,27 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-burgundy-50: #fbf2f4;
+    --color-burgundy-100: #f5e1e6;
+    --color-burgundy-200: #e8b9c4;
+    --color-burgundy-300: #d68a9d;
+    --color-burgundy-400: #b85a72;
+    --color-burgundy-500: #9b3a52;
+    --color-burgundy-600: #800020;
+    --color-burgundy-700: #6b001b;
+    --color-burgundy-800: #560016;
+    --color-burgundy-900: #400010;
+}
+
+/* Soft dotted background motif with a faint burgundy tint. */
+@utility bg-motif {
+    background-color: #faf7f7;
+    background-image:
+        radial-gradient(color-mix(in oklab, var(--color-burgundy-600) 14%, transparent) 1px, transparent 1.5px),
+        radial-gradient(color-mix(in oklab, var(--color-burgundy-600) 7%, transparent) 1px, transparent 1.5px);
+    background-size: 22px 22px;
+    background-position:
+        0 0,
+        11px 11px;
 }
