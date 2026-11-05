@@ -50,14 +50,15 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
-     * A PIC must be an active staff account that belongs to the target division.
+     * A PIC must be an active staff account. Admins may pick staff of any division; others only staff of the target division.
      */
     protected function assignablePicRule(): Exists
     {
-        return Rule::exists('accounts', 'id')
+        $rule = Rule::exists('accounts', 'id')
             ->where('is_active', true)
-            ->where('division_id', $this->integer('division_id'))
             ->whereIn('role_id', Role::whereIn('code_role', Role::STAFF_ROLES)->pluck('id')->all());
+
+        return $this->user()?->isAdmin() ? $rule : $rule->where('division_id', $this->integer('division_id'));
     }
 
     /**

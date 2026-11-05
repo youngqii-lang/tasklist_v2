@@ -50,6 +50,14 @@ class TaskPolicy
     }
 
     /**
+     * Admins may assign or forward the PIC of every task; managers only within their own division.
+     */
+    public function assign(Account $user, Task $task): bool
+    {
+        return $this->manages($user, $task);
+    }
+
+    /**
      * Only admins may move a task to another division.
      */
     public function changeDivision(Account $user, Task $task, Division $division): bool

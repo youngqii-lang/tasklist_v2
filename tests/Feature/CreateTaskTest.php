@@ -221,7 +221,7 @@ class CreateTaskTest extends TestCase
 
     public function test_pic_must_be_active_staff_from_the_target_division(): void
     {
-        $admin = Account::factory()->admin()->create();
+        $manager = Account::factory()->manager()->for($this->division)->create();
         $invalidPics = [
             Account::factory()->employee()->create(),
             Account::factory()->employee()->for($this->division)->inactive()->create(),
@@ -230,13 +230,24 @@ class CreateTaskTest extends TestCase
         ];
 
         foreach ($invalidPics as $pic) {
-            $this->actingAs($admin)
+            $this->actingAs($manager)
                 ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$pic->id]]))
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors(['pic_ids.0' => 'PIC harus akun Staff aktif dari divisi yang dipilih.']);
         }
 
         $this->assertDatabaseCount('tasks', 0);
+    }
+
+    public function test_admin_can_assign_active_staff_from_another_division(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $otherDivisionStaff = Account::factory()->employee()->create();
+
+        $this->actingAs($admin)
+            ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$otherDivisionStaff->id]]))
+            ->assertCreated()
+            ->assertJsonPath('data.pics.0.id', $otherDivisionStaff->id);
     }
 
     public function test_the_same_pic_cannot_be_chosen_twice(): void

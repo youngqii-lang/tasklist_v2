@@ -21,6 +21,8 @@ class TaskActivity extends Model
 
     public const string ACTION_UPDATED = 'updated';
 
+    public const string ACTION_PIC_CHANGED = 'pic_changed';
+
     /**
      * Display labels for every recorded action.
      *
@@ -28,6 +30,7 @@ class TaskActivity extends Model
      */
     public const array ACTION_LABELS = [
         self::ACTION_UPDATED => 'Informasi tugas diperbarui',
+        self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
     ];
 
     /**
