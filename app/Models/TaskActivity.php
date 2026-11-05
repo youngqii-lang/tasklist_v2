@@ -27,6 +27,10 @@ class TaskActivity extends Model
 
     public const string ACTION_EVIDENCE_ADDED = 'evidence_added';
 
+    public const string ACTION_APPROVED = 'approved';
+
+    public const string ACTION_REVISION_REQUESTED = 'revision_requested';
+
     /**
      * Display labels for every recorded action.
      *
@@ -37,6 +41,8 @@ class TaskActivity extends Model
         self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
         self::ACTION_STATUS_CHANGED => 'Status tugas diubah',
         self::ACTION_EVIDENCE_ADDED => 'Evidence ditambahkan',
+        self::ACTION_APPROVED => 'Tugas disetujui',
+        self::ACTION_REVISION_REQUESTED => 'Revisi diminta',
     ];
 
     /**

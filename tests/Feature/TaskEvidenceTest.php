@@ -224,7 +224,7 @@ class TaskEvidenceTest extends TestCase
         $firstEvidence = TaskEvidence::factory()->for($this->task)->create();
 
         $this->actingAs($manager)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_IN_PROGRESS, 'version' => 1])
+            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_IN_PROGRESS, 'version' => 1, 'note' => 'Revisi'])
             ->assertOk();
 
         $this->actingAs($this->pic)

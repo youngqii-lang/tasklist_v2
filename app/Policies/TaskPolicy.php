@@ -58,6 +58,14 @@ class TaskPolicy
     }
 
     /**
+     * Admins may review every task; managers only the tasks of their own division.
+     */
+    public function review(Account $user, Task $task): bool
+    {
+        return $this->manages($user, $task);
+    }
+
+    /**
      * Only a current PIC may submit evidence of the work.
      */
     public function addEvidence(Account $user, Task $task): bool

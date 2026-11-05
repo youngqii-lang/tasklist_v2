@@ -6,9 +6,11 @@ use App\Exceptions\InvalidTaskTransitionException;
 use App\Models\Account;
 use App\Models\Task;
 use App\Models\TaskActivity;
+use App\Models\TaskReview;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class TaskWorkflowService
 {
@@ -36,14 +38,41 @@ class TaskWorkflowService
     ];
 
     /**
+     * Review decisions made by leaving On QA: to status => decision.
+     *
+     * @var array<string, string>
+     */
+    protected const array REVIEW_DECISIONS = [
+        Task::STATUS_DONE => TaskReview::DECISION_APPROVED,
+        Task::STATUS_IN_PROGRESS => TaskReview::DECISION_REVISION_REQUESTED,
+    ];
+
+    /**
+     * Record a review decision on a task that is On QA and move it to the matching status.
+     *
+     * @throws InvalidTaskTransitionException
+     */
+    public function review(Account $reviewer, Task $task, string $decision, int $version, ?string $note = null): Task
+    {
+        if ($task->status !== Task::STATUS_ON_REVIEW) {
+            throw new InvalidTaskTransitionException('Keputusan review hanya dapat diberikan pada tugas berstatus On QA.');
+        }
+
+        return $this->transition($reviewer, $task, array_search($decision, self::REVIEW_DECISIONS, true), $version, $note);
+    }
+
+    /**
      * Move a task to another status, following the transition matrix and the QA rules.
+     *
+     * Leaving On QA is a review decision: it is stored in task_reviews, and a revision needs a note.
      *
      * @throws AuthorizationException
      * @throws InvalidTaskTransitionException
+     * @throws ValidationException
      */
-    public function transition(Account $actor, Task $task, string $toStatus, int $version): Task
+    public function transition(Account $actor, Task $task, string $toStatus, int $version, ?string $note = null): Task
     {
-        return DB::transaction(function () use ($actor, $task, $toStatus, $version) {
+        return DB::transaction(function () use ($actor, $task, $toStatus, $version, $note) {
             $task = $task->lockForVersion($version);
             $fromStatus = $task->status;
             $allowedBy = self::TRANSITIONS[$fromStatus][$toStatus] ?? null;
@@ -64,14 +93,29 @@ class TaskWorkflowService
 
             $this->ensureRequirementsAreMet($task, $toStatus);
 
+            $decision = $fromStatus === Task::STATUS_ON_REVIEW ? self::REVIEW_DECISIONS[$toStatus] : null;
+
+            if ($decision === TaskReview::DECISION_REVISION_REQUESTED && blank($note)) {
+                throw ValidationException::withMessages(['note' => 'Catatan revisi wajib diisi.']);
+            }
+
             $task->status = $toStatus;
             $task->completed_at = $toStatus === Task::STATUS_DONE ? now() : null;
             $task->version++;
             $task->save();
 
-            $task->recordActivity($actor, TaskActivity::ACTION_STATUS_CHANGED, [
+            if ($decision !== null) {
+                $task->reviews()->create(['reviewer_id' => $actor->id, 'decision' => $decision, 'note' => $note]);
+            }
+
+            $task->recordActivity($actor, match ($decision) {
+                TaskReview::DECISION_APPROVED => TaskActivity::ACTION_APPROVED,
+                TaskReview::DECISION_REVISION_REQUESTED => TaskActivity::ACTION_REVISION_REQUESTED,
+                default => TaskActivity::ACTION_STATUS_CHANGED,
+            }, array_filter([
                 'status' => ['from' => $fromStatus, 'to' => $toStatus],
-            ]);
+                'note' => $decision !== null ? $note : null,
+            ]));
 
             return $task;
         });

@@ -7,6 +7,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\TaskOptionController;
 use App\Http\Controllers\TaskPicController;
+use App\Http\Controllers\TaskReviewController;
 use App\Http\Controllers\TaskStatusController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,9 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update'])->whereNumber('task');
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
         Route::patch('/tasks/{task}/status', [TaskStatusController::class, 'update'])->whereNumber('task')->name('tasks.status.update');
+
+        Route::get('/tasks/{task}/reviews', [TaskReviewController::class, 'index'])->whereNumber('task')->name('tasks.reviews.index');
+        Route::post('/tasks/{task}/reviews', [TaskReviewController::class, 'store'])->whereNumber('task')->name('tasks.reviews.store');
 
         Route::whereNumber(['task', 'evidence'])->group(function () {
             Route::get('/tasks/{task}/evidences', [TaskEvidenceController::class, 'index'])->name('tasks.evidences.index');

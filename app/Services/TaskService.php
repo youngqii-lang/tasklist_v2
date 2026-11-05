@@ -122,6 +122,7 @@ class TaskService
             'creator',
             'pics',
             'evidences' => fn ($query) => $query->with('submitter')->latest()->latest('id'),
+            'reviews' => fn ($query) => $query->with('reviewer')->latest()->latest('id'),
             'activities' => fn ($query) => $query->with('account')->latest()->latest('id'),
         ]);
     }
