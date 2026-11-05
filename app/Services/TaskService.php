@@ -2,9 +2,15 @@
 
 namespace App\Services;
 
+use App\Exceptions\TaskReviewSettingsLockedException;
 use App\Models\Account;
+use App\Models\Division;
+use App\Models\Platform;
 use App\Models\Task;
+use App\Models\TaskActivity;
 use App\Models\TaskCategory;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class TaskService
@@ -60,5 +66,121 @@ class TaskService
 
             return $task->load(['division', 'category', 'platform', 'creator', 'pics']);
         });
+    }
+
+    /**
+     * Update the main information of a task and record what changed.
+     *
+     * The QA requirement follows the category when the task has one, and cannot change once the task is in review or done.
+     *
+     * @param  array{
+     *     version: int,
+     *     title?: string,
+     *     description?: string|null,
+     *     division_id?: int,
+     *     category_id?: int|null,
+     *     platform_id?: int|null,
+     *     priority?: string,
+     *     start_date?: string|null,
+     *     deadline?: string|null,
+     *     requires_review?: bool,
+     * }  $data
+     */
+    public function update(Account $editor, Task $task, array $data): Task
+    {
+        return DB::transaction(function () use ($editor, $task, $data) {
+            $task = $task->lockForVersion((int) $data['version']);
+
+            $task->fill($this->withReviewSettings($task, Arr::except($data, 'version')));
+
+            if ($task->isDirty(['category_id', 'requires_review', 'evidence_required'])
+                && in_array($task->status, Task::REVIEW_STAGE_STATUSES, true)) {
+                throw new TaskReviewSettingsLockedException;
+            }
+
+            $changes = $this->describeChanges($task);
+
+            if ($changes !== []) {
+                $task->version++;
+                $task->save();
+                $task->recordActivity($editor, TaskActivity::ACTION_UPDATED, $changes);
+            }
+
+            return $this->loadDetail($task);
+        });
+    }
+
+    /**
+     * Load everything the task detail panel shows.
+     */
+    public function loadDetail(Task $task): Task
+    {
+        return $task->load([
+            'division',
+            'category',
+            'platform',
+            'creator',
+            'pics',
+            'activities' => fn ($query) => $query->with('account')->latest()->latest('id'),
+        ]);
+    }
+
+    /**
+     * Derive the QA settings from the category, when the task has or gets one.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    protected function withReviewSettings(Task $task, array $attributes): array
+    {
+        $categoryId = array_key_exists('category_id', $attributes) ? $attributes['category_id'] : $task->category_id;
+        $category = $categoryId ? TaskCategory::find($categoryId) : null;
+
+        if ($category !== null) {
+            $attributes['requires_review'] = $category->requires_review;
+            $attributes['evidence_required'] = $category->evidence_required;
+        } elseif (array_key_exists('category_id', $attributes)) {
+            $attributes['evidence_required'] = false;
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Describe the dirty attributes as before and after values for the activity history.
+     *
+     * @return array<string, array{from: mixed, to: mixed}>
+     */
+    protected function describeChanges(Task $task): array
+    {
+        $relations = [
+            'division_id' => ['division', Division::class],
+            'category_id' => ['category', TaskCategory::class],
+            'platform_id' => ['platform', Platform::class],
+        ];
+
+        $changes = [];
+
+        foreach (array_keys($task->getDirty()) as $attribute) {
+            $from = $task->getOriginal($attribute);
+            $to = $task->getAttribute($attribute);
+
+            if (isset($relations[$attribute])) {
+                [$name, $model] = $relations[$attribute];
+                $changes[$name] = [
+                    'from' => $from ? $model::find($from)?->name : null,
+                    'to' => $to ? $model::find($to)?->name : null,
+                ];
+
+                continue;
+            }
+
+            $changes[$attribute] = [
+                'from' => $from instanceof CarbonInterface ? $from->toDateString() : $from,
+                'to' => $to instanceof CarbonInterface ? $to->toDateString() : $to,
+            ];
+        }
+
+        return $changes;
     }
 }

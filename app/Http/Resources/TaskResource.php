@@ -52,7 +52,14 @@ class TaskResource extends JsonResource
                 'fullname' => $pic->fullname,
                 'username' => $pic->username,
             ])->all()),
+            'activities' => TaskActivityResource::collection($this->whenLoaded('activities')),
+            'version' => $this->version,
+            'completed_at' => $this->completed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
+            'updated_at' => $this->updated_at?->toIso8601String(),
+            'abilities' => [
+                'update' => (bool) $request->user()?->can('update', $this->resource),
+            ],
         ];
     }
 }
