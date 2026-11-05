@@ -81,8 +81,8 @@ class Task extends Model
         self::STATUS_BACKLOG => 'Back Log',
         self::STATUS_TODO => 'To Do',
         self::STATUS_IN_PROGRESS => 'On Process',
-        self::STATUS_READY_REVIEW => 'Ready for QA',
-        self::STATUS_ON_REVIEW => 'On QA',
+        self::STATUS_READY_REVIEW => 'Ready Review',
+        self::STATUS_ON_REVIEW => 'On Review',
         self::STATUS_DONE => 'Done',
     ];
 

@@ -12,17 +12,23 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Status workflow following the TASK-17 transition matrix.
+ *
+ * A PIC can bring a task at most to Ready Review; reviewing, revising and finishing stay with the
+ * admin, manager or supervisor who manages the task.
+ */
 class TaskWorkflowService
 {
     /**
-     * The transition may be done by an admin or the manager of the task's division.
+     * The transition may be done by an admin, or a manager or supervisor of the task's division.
      */
     protected const string BY_MANAGER = 'manager';
 
     /**
-     * The transition may be done by a PIC of the task.
+     * The transition may be done by a PIC of the task or by its manager.
      */
-    protected const string BY_PIC = 'pic';
+    protected const string BY_PIC_OR_MANAGER = 'pic_or_manager';
 
     /**
      * Allowed transitions: from status => [to status => who may do it].
@@ -31,40 +37,40 @@ class TaskWorkflowService
      */
     protected const array TRANSITIONS = [
         Task::STATUS_BACKLOG => [Task::STATUS_TODO => self::BY_MANAGER],
-        Task::STATUS_TODO => [Task::STATUS_IN_PROGRESS => self::BY_PIC],
-        Task::STATUS_IN_PROGRESS => [Task::STATUS_READY_REVIEW => self::BY_PIC, Task::STATUS_DONE => self::BY_PIC],
+        Task::STATUS_TODO => [Task::STATUS_IN_PROGRESS => self::BY_PIC_OR_MANAGER],
+        Task::STATUS_IN_PROGRESS => [Task::STATUS_READY_REVIEW => self::BY_PIC_OR_MANAGER, Task::STATUS_DONE => self::BY_MANAGER],
         Task::STATUS_READY_REVIEW => [Task::STATUS_ON_REVIEW => self::BY_MANAGER],
-        Task::STATUS_ON_REVIEW => [Task::STATUS_DONE => self::BY_MANAGER, Task::STATUS_IN_PROGRESS => self::BY_MANAGER],
+        Task::STATUS_ON_REVIEW => [Task::STATUS_DONE => self::BY_MANAGER, Task::STATUS_BACKLOG => self::BY_MANAGER],
     ];
 
     /**
-     * Review decisions made by leaving On QA: to status => decision.
+     * Review decisions made by leaving On Review: to status => decision.
      *
      * @var array<string, string>
      */
     protected const array REVIEW_DECISIONS = [
         Task::STATUS_DONE => TaskReview::DECISION_APPROVED,
-        Task::STATUS_IN_PROGRESS => TaskReview::DECISION_REVISION_REQUESTED,
+        Task::STATUS_BACKLOG => TaskReview::DECISION_REVISION_REQUESTED,
     ];
 
     /**
-     * Record a review decision on a task that is On QA and move it to the matching status.
+     * Record a review decision on a task that is On Review and move it to the matching status.
      *
      * @throws InvalidTaskTransitionException
      */
     public function review(Account $reviewer, Task $task, string $decision, int $version, ?string $note = null): Task
     {
         if ($task->status !== Task::STATUS_ON_REVIEW) {
-            throw new InvalidTaskTransitionException('Keputusan review hanya dapat diberikan pada tugas berstatus On QA.');
+            throw new InvalidTaskTransitionException('Keputusan review hanya dapat diberikan pada tugas berstatus On Review.');
         }
 
         return $this->transition($reviewer, $task, array_search($decision, self::REVIEW_DECISIONS, true), $version, $note);
     }
 
     /**
-     * Move a task to another status, following the transition matrix and the QA rules.
+     * Move a task to another status, following the transition matrix and the review rules.
      *
-     * Leaving On QA is a review decision: it is stored in task_reviews, and a revision needs a note.
+     * Leaving On Review is a review decision: it is stored in task_reviews, and a revision (back to Back Log) needs a note.
      *
      * @throws AuthorizationException
      * @throws InvalidTaskTransitionException
@@ -86,9 +92,9 @@ class TaskWorkflowService
             }
 
             if (! $this->isAllowedBy($actor, $task, $allowedBy)) {
-                throw new AuthorizationException($allowedBy === self::BY_PIC
-                    ? 'Hanya PIC tugas yang dapat melakukan perpindahan status ini.'
-                    : 'Hanya Admin atau Manajer divisi yang dapat melakukan perpindahan status ini.');
+                throw new AuthorizationException($allowedBy === self::BY_PIC_OR_MANAGER
+                    ? 'Hanya PIC tugas atau Admin/Manajer/Supervisor yang berwenang yang dapat melakukan perpindahan status ini.'
+                    : 'Hanya Admin, Manajer, atau Supervisor yang berwenang yang dapat melakukan perpindahan status ini.');
             }
 
             $this->ensureRequirementsAreMet($task, $toStatus);
@@ -152,26 +158,24 @@ class TaskWorkflowService
     }
 
     /**
-     * Determine whether the account holds the role the transition requires.
+     * Determine whether the account holds the authority the transition requires.
      */
     protected function isAllowedBy(Account $actor, Task $task, string $allowedBy): bool
     {
+        $manages = Gate::forUser($actor)->allows('manage', $task);
+
         return match ($allowedBy) {
-            self::BY_PIC => $task->hasActivePic($actor),
-            self::BY_MANAGER => Gate::forUser($actor)->allows('manage', $task),
+            self::BY_PIC_OR_MANAGER => $manages || $task->hasActivePic($actor),
+            self::BY_MANAGER => $manages,
         };
     }
 
     /**
-     * Tasks with QA must go through Ready for QA; tasks without QA go straight to Done.
+     * Only tasks without a review requirement may be finished straight from On Process.
      */
     protected function reviewRuleAllows(Task $task, string $toStatus): bool
     {
-        if ($task->status !== Task::STATUS_IN_PROGRESS) {
-            return true;
-        }
-
-        return $toStatus === Task::STATUS_READY_REVIEW ? $task->requires_review : ! $task->requires_review;
+        return ! ($task->status === Task::STATUS_IN_PROGRESS && $toStatus === Task::STATUS_DONE && $task->requires_review);
     }
 
     /**
@@ -180,9 +184,7 @@ class TaskWorkflowService
     protected function ensureRequirementsAreMet(Task $task, string $toStatus): void
     {
         if (! $this->reviewRuleAllows($task, $toStatus)) {
-            throw new InvalidTaskTransitionException($task->requires_review
-                ? 'Tugas ini wajib QA, kirim ke Ready for QA terlebih dahulu.'
-                : 'Tugas ini tidak wajib QA, selesaikan langsung ke Done.');
+            throw new InvalidTaskTransitionException('Tugas ini wajib review, kirim ke Ready Review terlebih dahulu.');
         }
 
         $isSubmission = $task->status === Task::STATUS_IN_PROGRESS

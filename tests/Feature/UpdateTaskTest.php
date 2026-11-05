@@ -204,7 +204,7 @@ class UpdateTaskTest extends TestCase
 
         $this->patchTask($admin, ['requires_review' => false])
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Kategori dan kewajiban QA tidak dapat diubah saat tugas sedang diperiksa atau sudah selesai.');
+            ->assertJsonPath('message', 'Kategori dan kewajiban review tidak dapat diubah saat tugas sedang diperiksa atau sudah selesai.');
 
         $this->assertTrue($this->task->fresh()->requires_review);
     }

@@ -100,7 +100,7 @@ class TaskListTest extends TestCase
             ->assertJsonPath('data.0.priority_label', 'Urgent')
             ->assertJsonPath('data.0.deadline', '2026-12-01')
             ->assertJsonPath('data.0.status', Task::STATUS_READY_REVIEW)
-            ->assertJsonPath('data.0.status_label', 'Ready for QA');
+            ->assertJsonPath('data.0.status_label', 'Ready Review');
     }
 
     public function test_tasks_can_be_searched_by_title(): void

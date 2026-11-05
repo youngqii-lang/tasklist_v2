@@ -80,7 +80,7 @@ class TaskRoleManagementTest extends TestCase
             ->assertJsonValidationErrors([
                 'division_id' => 'Anda tidak berwenang mengubah Divisi.',
                 'category_id' => 'Anda tidak berwenang mengubah Kategori.',
-                'requires_review' => 'Anda tidak berwenang mengubah Kewajiban QA.',
+                'requires_review' => 'Anda tidak berwenang mengubah Kewajiban review.',
             ]);
     }
 

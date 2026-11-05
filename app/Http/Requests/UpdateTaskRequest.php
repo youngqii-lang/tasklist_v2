@@ -141,7 +141,7 @@ class UpdateTaskRequest extends FormRequest
             'priority' => 'Prioritas',
             'start_date' => 'Tanggal mulai',
             'deadline' => 'Deadline',
-            'requires_review' => 'Kewajiban QA',
+            'requires_review' => 'Kewajiban review',
         ];
     }
 }
