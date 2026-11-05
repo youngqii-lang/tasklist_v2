@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
         Route::patch('/tasks/{task}/status', [TaskStatusController::class, 'update'])->whereNumber('task')->name('tasks.status.update');
 
+        Route::get('/tasks/{task}/preview', [TaskController::class, 'preview'])->whereNumber('task')->name('tasks.preview');
         Route::get('/tasks/{task}/activities', [TaskActivityController::class, 'index'])->whereNumber('task')->name('tasks.activities.index');
         Route::get('/tasks/{task}/reviews', [TaskReviewController::class, 'index'])->whereNumber('task')->name('tasks.reviews.index');
         Route::post('/tasks/{task}/reviews', [TaskReviewController::class, 'store'])->whereNumber('task')->name('tasks.reviews.store');
