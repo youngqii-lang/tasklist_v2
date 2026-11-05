@@ -32,6 +32,38 @@ class Task extends Model
     /** @use HasFactory<TaskFactory> */
     use HasFactory, SoftDeletes;
 
+    public const string STATUS_BACKLOG = 'backlog';
+
+    public const string STATUS_TODO = 'todo';
+
+    public const string STATUS_IN_PROGRESS = 'in_progress';
+
+    public const string STATUS_READY_REVIEW = 'ready_review';
+
+    public const string STATUS_ON_REVIEW = 'on_review';
+
+    public const string STATUS_DONE = 'done';
+
+    /**
+     * Statuses a task may start in when it is created.
+     *
+     * @var list<string>
+     */
+    public const array INITIAL_STATUSES = [self::STATUS_BACKLOG, self::STATUS_TODO];
+
+    public const string PRIORITY_LOW = 'low';
+
+    public const string PRIORITY_MEDIUM = 'medium';
+
+    public const string PRIORITY_HIGH = 'high';
+
+    public const string PRIORITY_URGENT = 'urgent';
+
+    /**
+     * @var list<string>
+     */
+    public const array PRIORITIES = [self::PRIORITY_LOW, self::PRIORITY_MEDIUM, self::PRIORITY_HIGH, self::PRIORITY_URGENT];
+
     /**
      * Get the category of the task.
      *
@@ -100,6 +132,16 @@ class Task extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(TaskAssignment::class);
+    }
+
+    /**
+     * Get the accounts currently assigned as PIC.
+     *
+     * @return BelongsToMany<Account, $this>
+     */
+    public function pics(): BelongsToMany
+    {
+        return $this->belongsToMany(Account::class, 'task_assignments')->wherePivotNull('unassigned_at');
     }
 
     /**

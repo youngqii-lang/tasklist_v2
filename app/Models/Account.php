@@ -37,6 +37,14 @@ class Account extends Authenticatable
     }
 
     /**
+     * Determine whether the account has the admin role.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role?->code_role === Role::ADMIN;
+    }
+
+    /**
      * Determine whether the account has the manager role.
      */
     public function isManager(): bool
