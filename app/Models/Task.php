@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -208,6 +210,84 @@ class Task extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(TaskActivity::class);
+    }
+
+    /**
+     * Limit the query to tasks the account is allowed to see.
+     *
+     * Admins see every division, managers their own division, and everyone else only the tasks they are PIC of.
+     *
+     * @param  Builder<Task>  $query
+     */
+    #[Scope]
+    protected function visibleTo(Builder $query, Account $account): void
+    {
+        if ($account->isAdmin()) {
+            return;
+        }
+
+        if ($account->isManager()) {
+            $query->where('division_id', $account->division_id);
+
+            return;
+        }
+
+        $query->assignedTo($account);
+    }
+
+    /**
+     * Limit the query to tasks the account is currently PIC of.
+     *
+     * @param  Builder<Task>  $query
+     */
+    #[Scope]
+    protected function assignedTo(Builder $query, Account $account): void
+    {
+        $query->whereHas('assignments', fn (Builder $assignments) => $assignments
+            ->where('account_id', $account->id)
+            ->whereNull('unassigned_at'));
+    }
+
+    /**
+     * Apply the Tasklist search and filters.
+     *
+     * @param  Builder<Task>  $query
+     * @param  array{search?: string|null, division_id?: int|null, priority?: string|null, status?: string|null}  $filters
+     */
+    #[Scope]
+    protected function filter(Builder $query, array $filters): void
+    {
+        $query
+            ->when($filters['search'] ?? null, fn (Builder $query, string $search) => $query
+                ->where('title', 'like', '%'.addcslashes($search, '%_\\').'%'))
+            ->when($filters['division_id'] ?? null, fn (Builder $query, int $divisionId) => $query->where('division_id', $divisionId))
+            ->when($filters['priority'] ?? null, fn (Builder $query, string $priority) => $query->where('priority', $priority))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status));
+    }
+
+    /**
+     * Order the query by a Tasklist column. Priority and status follow their business order, not the alphabet.
+     *
+     * @param  Builder<Task>  $query
+     */
+    #[Scope]
+    protected function sortBy(Builder $query, string $column, string $direction): void
+    {
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+        $orderedValues = match ($column) {
+            'priority' => self::PRIORITIES,
+            'status' => array_keys(self::STATUS_LABELS),
+            default => null,
+        };
+
+        if ($orderedValues === null) {
+            $query->orderBy($column, $direction);
+        } else {
+            $cases = collect($orderedValues)->keys()->map(fn (int $position) => "WHEN ? THEN {$position}")->implode(' ');
+            $query->orderByRaw("CASE {$column} {$cases} END {$direction}", $orderedValues);
+        }
+
+        $query->orderBy('id', $direction);
     }
 
     /**
