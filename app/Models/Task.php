@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Exceptions\StaleTaskVersionException;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -295,33 +297,80 @@ class Task extends Model
     }
 
     /**
-     * Limit the query to tasks the account is currently PIC of.
-     *
-     * @param  Builder<Task>  $query
-     */
-    #[Scope]
-    protected function assignedTo(Builder $query, Account $account): void
-    {
-        $query->whereHas('assignments', fn (Builder $assignments) => $assignments
-            ->where('account_id', $account->id)
-            ->whereNull('unassigned_at'));
-    }
-
-    /**
      * Apply the Tasklist search and filters.
      *
+     * The period filters (date, month, year, date range) apply to `date_field` (start_date or deadline, default deadline);
+     * tasks without that date never match a period filter.
+     *
      * @param  Builder<Task>  $query
-     * @param  array{search?: string|null, division_id?: int|null, priority?: string|null, status?: string|null}  $filters
+     * @param  array{
+     *     search?: string|null,
+     *     division_id?: int|string|null,
+     *     pic_id?: int|string|null,
+     *     priority?: string|null,
+     *     status?: string|null,
+     *     date_field?: string|null,
+     *     date?: string|null,
+     *     month?: string|null,
+     *     year?: int|string|null,
+     *     date_from?: string|null,
+     *     date_to?: string|null,
+     * }  $filters
      */
     #[Scope]
     protected function filter(Builder $query, array $filters): void
     {
+        $dateField = ($filters['date_field'] ?? null) === 'start_date' ? 'start_date' : 'deadline';
+        [$periodStart, $periodEnd] = self::periodBounds($filters);
+
         $query
             ->when($filters['search'] ?? null, fn (Builder $query, string $search) => $query
                 ->where('title', 'like', '%'.addcslashes($search, '%_\\').'%'))
-            ->when($filters['division_id'] ?? null, fn (Builder $query, int $divisionId) => $query->where('division_id', $divisionId))
+            ->when($filters['division_id'] ?? null, fn (Builder $query, $divisionId) => $query->where('division_id', (int) $divisionId))
+            ->when($filters['pic_id'] ?? null, fn (Builder $query, $picId) => $query->whereHas('assignments', fn (Builder $assignments) => $assignments
+                ->where('account_id', (int) $picId)
+                ->whereNull('unassigned_at')))
             ->when($filters['priority'] ?? null, fn (Builder $query, string $priority) => $query->where('priority', $priority))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status));
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($periodStart !== null || $periodEnd !== null, fn (Builder $query) => $query->whereNotNull($dateField))
+            ->when($periodStart, fn (Builder $query, CarbonInterface $start) => $query->whereDate($dateField, '>=', $start))
+            ->when($periodEnd, fn (Builder $query, CarbonInterface $end) => $query->whereDate($dateField, '<=', $end));
+    }
+
+    /**
+     * Combine the date, month, year and range filters into one inclusive period. Every given filter narrows the period.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{0: CarbonInterface|null, 1: CarbonInterface|null}
+     */
+    protected static function periodBounds(array $filters): array
+    {
+        $ranges = [];
+
+        if (! empty($filters['date'])) {
+            $day = CarbonImmutable::parse($filters['date']);
+            $ranges[] = [$day, $day];
+        }
+
+        if (! empty($filters['month'])) {
+            $month = CarbonImmutable::createFromFormat('Y-m-d', $filters['month'].'-01');
+            $ranges[] = [$month->startOfMonth(), $month->endOfMonth()];
+        }
+
+        if (! empty($filters['year'])) {
+            $year = CarbonImmutable::create((int) $filters['year']);
+            $ranges[] = [$year->startOfYear(), $year->endOfYear()];
+        }
+
+        $ranges[] = [
+            empty($filters['date_from']) ? null : CarbonImmutable::parse($filters['date_from']),
+            empty($filters['date_to']) ? null : CarbonImmutable::parse($filters['date_to']),
+        ];
+
+        $starts = array_filter(array_column($ranges, 0));
+        $ends = array_filter(array_column($ranges, 1));
+
+        return [$starts === [] ? null : max($starts), $ends === [] ? null : min($ends)];
     }
 
     /**

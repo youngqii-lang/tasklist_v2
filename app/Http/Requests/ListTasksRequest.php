@@ -34,6 +34,13 @@ class ListTasksRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:150'],
             'division_id' => ['nullable', 'integer', Rule::exists('divisions', 'id')],
+            'pic_id' => ['nullable', 'integer', Rule::exists('accounts', 'id')],
+            'date_field' => ['nullable', 'string', Rule::in(['start_date', 'deadline'])],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'month' => ['nullable', 'date_format:Y-m'],
+            'year' => ['nullable', 'integer', 'digits:4'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', Rule::when($this->filled('date_from'), ['after_or_equal:date_from'])],
             'priority' => ['nullable', 'string', Rule::in(Task::PRIORITIES)],
             'status' => ['nullable', 'string', Rule::in(array_keys(Task::STATUS_LABELS))],
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE_COLUMNS)],
@@ -56,6 +63,12 @@ class ListTasksRequest extends FormRequest
             'integer' => ':attribute harus berupa angka.',
             'exists' => ':attribute yang dipilih tidak valid.',
             'in' => ':attribute yang dipilih tidak valid.',
+            'digits' => ':attribute harus :digits digit.',
+            'date.date_format' => 'Tanggal harus berformat YYYY-MM-DD.',
+            'month.date_format' => 'Bulan harus berformat YYYY-MM.',
+            'date_from.date_format' => 'Tanggal awal harus berformat YYYY-MM-DD.',
+            'date_to.date_format' => 'Tanggal akhir harus berformat YYYY-MM-DD.',
+            'date_to.after_or_equal' => 'Tanggal akhir tidak boleh sebelum tanggal awal.',
         ];
     }
 
@@ -69,6 +82,13 @@ class ListTasksRequest extends FormRequest
         return [
             'search' => 'Pencarian',
             'division_id' => 'Divisi',
+            'pic_id' => 'PIC',
+            'date_field' => 'Dasar tanggal',
+            'date' => 'Tanggal',
+            'month' => 'Bulan',
+            'year' => 'Tahun',
+            'date_from' => 'Tanggal awal',
+            'date_to' => 'Tanggal akhir',
             'priority' => 'Prioritas',
             'status' => 'Status',
             'sort' => 'Urutan',
