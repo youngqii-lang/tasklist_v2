@@ -64,7 +64,18 @@ class TaskService
                 ]);
             }
 
-            return $task->load(['division', 'category', 'platform', 'creator', 'pics']);
+            $task->load(['division', 'category', 'platform', 'creator', 'pics']);
+
+            $task->recordActivity($creator, TaskActivity::ACTION_CREATED, [
+                'title' => ['from' => null, 'to' => $task->title],
+                'status' => ['from' => null, 'to' => $task->status],
+                'pics' => [
+                    'from' => [],
+                    'to' => $task->pics->map(fn (Account $pic) => ['id' => $pic->id, 'fullname' => $pic->fullname])->all(),
+                ],
+            ]);
+
+            return $task;
         });
     }
 
