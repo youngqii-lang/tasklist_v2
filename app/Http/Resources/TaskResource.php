@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\Account;
 use App\Models\Task;
+use App\Services\TaskWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -60,6 +61,9 @@ class TaskResource extends JsonResource
             'abilities' => [
                 'update' => (bool) $request->user()?->can('update', $this->resource),
                 'assign' => (bool) $request->user()?->can('assign', $this->resource),
+                'transitions' => $request->user()
+                    ? app(TaskWorkflowService::class)->availableTransitions($request->user(), $this->resource)
+                    : [],
             ],
         ];
     }
