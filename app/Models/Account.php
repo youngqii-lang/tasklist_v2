@@ -60,6 +60,7 @@ class Account extends Authenticatable
     protected function casts(): array
     {
         return [
+            'is_active' => 'boolean',
             'password' => 'hashed',
         ];
     }

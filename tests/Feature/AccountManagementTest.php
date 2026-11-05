@@ -51,7 +51,7 @@ class AccountManagementTest extends TestCase
 
         $this->assertSame(7, $response->viewData('totalAccounts'));
         $this->assertSame(
-            ['Employee' => 4, 'Manager' => 3],
+            ['Admin' => 0, 'Employee' => 4, 'Freelance' => 0, 'Manager' => 3, 'Supervisor' => 0],
             $response->viewData('roles')->pluck('accounts_count', 'name')->all(),
         );
 
