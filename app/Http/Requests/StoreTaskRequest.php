@@ -57,7 +57,7 @@ class StoreTaskRequest extends FormRequest
         return Rule::exists('accounts', 'id')
             ->where('is_active', true)
             ->where('division_id', $this->integer('division_id'))
-            ->whereIn('role_id', Role::whereIn('code_role', [Role::EMPLOYEE, Role::FREELANCE])->pluck('id')->all());
+            ->whereIn('role_id', Role::whereIn('code_role', Role::STAFF_ROLES)->pluck('id')->all());
     }
 
     /**

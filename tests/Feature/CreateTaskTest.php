@@ -44,7 +44,7 @@ class CreateTaskTest extends TestCase
     {
         $admin = Account::factory()->admin()->withoutDivision()->create();
 
-        $response = $this->actingAs($admin)->postJson(route('tasks.store'), $this->payload());
+        $response = $this->actingAs($admin)->postJson(route('api.tasks.store'), $this->payload());
 
         $response->assertCreated()
             ->assertJsonPath('message', 'Tugas berhasil dibuat.')
@@ -64,7 +64,7 @@ class CreateTaskTest extends TestCase
         $manager = Account::factory()->manager()->for($this->division)->create();
 
         $this->actingAs($manager)
-            ->postJson(route('tasks.store'), $this->payload())
+            ->postJson(route('api.tasks.store'), $this->payload())
             ->assertCreated();
 
         $this->assertDatabaseCount('tasks', 1);
@@ -75,7 +75,7 @@ class CreateTaskTest extends TestCase
         $manager = Account::factory()->manager()->create();
 
         $this->actingAs($manager)
-            ->postJson(route('tasks.store'), $this->payload())
+            ->postJson(route('api.tasks.store'), $this->payload())
             ->assertForbidden();
 
         $this->assertDatabaseCount('tasks', 0);
@@ -86,7 +86,7 @@ class CreateTaskTest extends TestCase
         $manager = Account::factory()->manager()->withoutDivision()->create();
 
         $this->actingAs($manager)
-            ->postJson(route('tasks.store'), $this->payload())
+            ->postJson(route('api.tasks.store'), $this->payload())
             ->assertForbidden();
     }
 
@@ -100,7 +100,7 @@ class CreateTaskTest extends TestCase
 
         foreach ($accounts as $account) {
             $this->actingAs($account)
-                ->postJson(route('tasks.store'), $this->payload())
+                ->postJson(route('api.tasks.store'), $this->payload())
                 ->assertForbidden();
         }
 
@@ -109,7 +109,7 @@ class CreateTaskTest extends TestCase
 
     public function test_guest_cannot_create_a_task(): void
     {
-        $this->postJson(route('tasks.store'), $this->payload())->assertUnauthorized();
+        $this->postJson(route('api.tasks.store'), $this->payload())->assertUnauthorized();
     }
 
     public function test_title_and_division_are_required(): void
@@ -117,7 +117,7 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), [])
+            ->postJson(route('api.tasks.store'), [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'title' => 'Judul tugas wajib diisi.',
@@ -130,7 +130,7 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload([
+            ->postJson(route('api.tasks.store'), $this->payload([
                 'division_id' => 999,
                 'category_id' => 999,
                 'platform_id' => 999,
@@ -144,7 +144,7 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload())
+            ->postJson(route('api.tasks.store'), $this->payload())
             ->assertCreated()
             ->assertJsonPath('data.status', Task::STATUS_BACKLOG)
             ->assertJsonPath('data.priority', Task::PRIORITY_MEDIUM)
@@ -156,12 +156,12 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['priority' => 'critical']))
+            ->postJson(route('api.tasks.store'), $this->payload(['priority' => 'critical']))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('priority');
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['priority' => Task::PRIORITY_URGENT]))
+            ->postJson(route('api.tasks.store'), $this->payload(['priority' => Task::PRIORITY_URGENT]))
             ->assertCreated()
             ->assertJsonPath('data.priority', Task::PRIORITY_URGENT);
     }
@@ -171,7 +171,7 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['status' => Task::STATUS_DONE]))
+            ->postJson(route('api.tasks.store'), $this->payload(['status' => Task::STATUS_DONE]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('status');
     }
@@ -181,7 +181,7 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['status' => Task::STATUS_TODO]))
+            ->postJson(route('api.tasks.store'), $this->payload(['status' => Task::STATUS_TODO]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'pic_ids' => 'PIC wajib dipilih untuk tugas berstatus To Do.',
@@ -197,7 +197,7 @@ class CreateTaskTest extends TestCase
         $employee = Account::factory()->employee()->for($this->division)->create();
         $freelance = Account::factory()->freelance()->for($this->division)->create();
 
-        $response = $this->actingAs($admin)->postJson(route('tasks.store'), $this->payload([
+        $response = $this->actingAs($admin)->postJson(route('api.tasks.store'), $this->payload([
             'status' => Task::STATUS_TODO,
             'deadline' => now()->addWeek()->toDateString(),
             'pic_ids' => [$employee->id, $freelance->id],
@@ -231,7 +231,7 @@ class CreateTaskTest extends TestCase
 
         foreach ($invalidPics as $pic) {
             $this->actingAs($admin)
-                ->postJson(route('tasks.store'), $this->payload(['pic_ids' => [$pic->id]]))
+                ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$pic->id]]))
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors(['pic_ids.0' => 'PIC harus akun Staff aktif dari divisi yang dipilih.']);
         }
@@ -245,7 +245,7 @@ class CreateTaskTest extends TestCase
         $employee = Account::factory()->employee()->for($this->division)->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['pic_ids' => [$employee->id, $employee->id]]))
+            ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$employee->id, $employee->id]]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('pic_ids.0');
     }
@@ -255,12 +255,12 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['deadline' => now()->subDay()->toDateString()]))
+            ->postJson(route('api.tasks.store'), $this->payload(['deadline' => now()->subDay()->toDateString()]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('deadline');
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload([
+            ->postJson(route('api.tasks.store'), $this->payload([
                 'start_date' => now()->addDays(5)->toDateString(),
                 'deadline' => now()->addDays(2)->toDateString(),
             ]))
@@ -276,7 +276,7 @@ class CreateTaskTest extends TestCase
         $category = TaskCategory::factory()->create(['requires_review' => true, 'evidence_required' => true]);
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload([
+            ->postJson(route('api.tasks.store'), $this->payload([
                 'category_id' => $category->id,
                 'requires_review' => false,
             ]))
@@ -291,7 +291,7 @@ class CreateTaskTest extends TestCase
         $admin = Account::factory()->admin()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['requires_review' => true]))
+            ->postJson(route('api.tasks.store'), $this->payload(['requires_review' => true]))
             ->assertCreated()
             ->assertJsonPath('data.category', null)
             ->assertJsonPath('data.requires_review', true)
@@ -304,7 +304,7 @@ class CreateTaskTest extends TestCase
         $platform = Platform::factory()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload([
+            ->postJson(route('api.tasks.store'), $this->payload([
                 'description' => 'Konten untuk Instagram dan TikTok.',
                 'platform_id' => $platform->id,
                 'start_date' => now()->toDateString(),
@@ -323,7 +323,7 @@ class CreateTaskTest extends TestCase
         $otherAccount = Account::factory()->manager()->create();
 
         $this->actingAs($admin)
-            ->postJson(route('tasks.store'), $this->payload(['creator_id' => $otherAccount->id]))
+            ->postJson(route('api.tasks.store'), $this->payload(['creator_id' => $otherAccount->id]))
             ->assertCreated();
 
         $this->assertSame($admin->id, Task::sole()->creator_id);

@@ -5,6 +5,8 @@ namespace App\Models;
 use Database\Factories\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -50,6 +52,19 @@ class Account extends Authenticatable
     public function isManager(): bool
     {
         return $this->role?->code_role === Role::MANAGER;
+    }
+
+    /**
+     * Limit the query to active staff accounts that can be assigned as task PIC.
+     *
+     * @param  Builder<Account>  $query
+     */
+    #[Scope]
+    protected function assignableAsPic(Builder $query, ?int $divisionId = null): void
+    {
+        $query->where('is_active', true)
+            ->whereHas('role', fn (Builder $role) => $role->whereIn('code_role', Role::STAFF_ROLES))
+            ->when($divisionId !== null, fn (Builder $accounts) => $accounts->where('division_id', $divisionId));
     }
 
     /**

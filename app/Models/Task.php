@@ -51,6 +51,20 @@ class Task extends Model
      */
     public const array INITIAL_STATUSES = [self::STATUS_BACKLOG, self::STATUS_TODO];
 
+    /**
+     * Display labels for every status, in workflow order.
+     *
+     * @var array<string, string>
+     */
+    public const array STATUS_LABELS = [
+        self::STATUS_BACKLOG => 'Back Log',
+        self::STATUS_TODO => 'To Do',
+        self::STATUS_IN_PROGRESS => 'On Process',
+        self::STATUS_READY_REVIEW => 'Ready for QA',
+        self::STATUS_ON_REVIEW => 'On QA',
+        self::STATUS_DONE => 'Done',
+    ];
+
     public const string PRIORITY_LOW = 'low';
 
     public const string PRIORITY_MEDIUM = 'medium';
@@ -63,6 +77,18 @@ class Task extends Model
      * @var list<string>
      */
     public const array PRIORITIES = [self::PRIORITY_LOW, self::PRIORITY_MEDIUM, self::PRIORITY_HIGH, self::PRIORITY_URGENT];
+
+    /**
+     * Display labels for every priority, from lowest to highest.
+     *
+     * @var array<string, string>
+     */
+    public const array PRIORITY_LABELS = [
+        self::PRIORITY_LOW => 'Low',
+        self::PRIORITY_MEDIUM => 'Medium',
+        self::PRIORITY_HIGH => 'High',
+        self::PRIORITY_URGENT => 'Urgent',
+    ];
 
     /**
      * Get the category of the task.
