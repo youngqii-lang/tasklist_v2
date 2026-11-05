@@ -20,6 +20,15 @@
         </header>
 
         <main class="px-4 py-8 lg:px-10 lg:py-10">
+            @if (session('status'))
+                <div role="status" class="mx-auto mb-6 flex max-w-5xl items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0">
+                        <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                    {{ session('status') }}
+                </div>
+            @endif
+
             @yield('page')
         </main>
     </div>

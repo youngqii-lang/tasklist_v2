@@ -40,6 +40,15 @@
 
         <div>
             <p class="mb-2 px-3 text-xs font-medium text-burgundy-300">Sistem</p>
+            <x-sidebar-link :href="route('accounts.index')" :active="request()->routeIs(['accounts.*', 'divisions.*'])" class="mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Organization Management
+            </x-sidebar-link>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-burgundy-100 transition hover:bg-burgundy-800 hover:text-white">

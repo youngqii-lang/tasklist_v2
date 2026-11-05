@@ -26,6 +26,45 @@ if (sidebar && sidebarOverlay) {
 }
 
 /**
+ * Submit a filter form as soon as one of its [data-auto-submit] fields changes.
+ */
+document.querySelectorAll('[data-auto-submit]').forEach((field) => {
+    field.addEventListener('change', () => field.form?.requestSubmit());
+});
+
+/**
+ * Ask for confirmation in a dialog before submitting a [data-confirm-delete] form.
+ */
+const deleteDialog = document.getElementById('confirm-delete-dialog');
+
+if (deleteDialog) {
+    let pendingDeleteForm = null;
+    const nameElement = deleteDialog.querySelector('[data-confirm-delete-name]');
+    const noteElement = deleteDialog.querySelector('[data-confirm-delete-note]');
+
+    document.querySelectorAll('form[data-confirm-delete]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            pendingDeleteForm = form;
+            nameElement.textContent = form.dataset.confirmDelete;
+            noteElement.textContent = form.dataset.confirmDeleteNote ?? '';
+            noteElement.hidden = !form.dataset.confirmDeleteNote;
+            deleteDialog.showModal();
+        });
+    });
+
+    deleteDialog.querySelector('[data-confirm-delete-cancel]').addEventListener('click', () => deleteDialog.close());
+
+    deleteDialog.querySelector('[data-confirm-delete-submit]').addEventListener('click', () => {
+        pendingDeleteForm?.submit();
+    });
+
+    deleteDialog.addEventListener('close', () => {
+        pendingDeleteForm = null;
+    });
+}
+
+/**
  * Toggle password visibility for any button with a [data-password-toggle]
  * attribute pointing at the id of a password input.
  */
