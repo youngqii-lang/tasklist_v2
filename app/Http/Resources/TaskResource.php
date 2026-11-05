@@ -30,6 +30,7 @@ class TaskResource extends JsonResource
             'priority_label' => Task::PRIORITY_LABELS[$this->priority] ?? $this->priority,
             'start_date' => $this->start_date?->toDateString(),
             'deadline' => $this->deadline?->toDateString(),
+            'is_overdue' => $this->isOverdue(),
             'requires_review' => $this->requires_review,
             'evidence_required' => $this->evidence_required,
             'division' => $this->whenLoaded('division', fn () => [

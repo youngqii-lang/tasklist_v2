@@ -80,28 +80,13 @@ class TimelineService
      */
     protected function events(CarbonImmutable $from, CarbonImmutable $to, ?int $divisionId): array
     {
-        $rangeStart = $from->startOfDay();
-        $rangeEnd = $to->endOfDay();
-
         return CalendarEvent::query()
             ->with('division')
-            ->when($divisionId, fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                ->where('division_id', $divisionId)
-                ->orWhereNull('division_id')))
-            ->where('start_at', '<=', $rangeEnd)
-            ->where(fn (Builder $query) => $query
-                ->where('end_at', '>=', $rangeStart)
-                ->orWhere(fn (Builder $query) => $query->whereNull('end_at')->where('start_at', '>=', $rangeStart)))
+            ->sharedWith($divisionId)
+            ->overlapping($from->startOfDay(), $to->endOfDay())
             ->orderBy('start_at')
             ->get()
-            ->map(fn (CalendarEvent $event) => [
-                'id' => $event->id,
-                'title' => $event->title,
-                'description' => $event->description,
-                'division' => $event->division ? ['id' => $event->division->id, 'name' => $event->division->name] : null,
-                'start_at' => $event->start_at->toIso8601String(),
-                'end_at' => $event->end_at?->toIso8601String(),
-            ])
+            ->map(fn (CalendarEvent $event) => $event->toSharedArray())
             ->all();
     }
 }

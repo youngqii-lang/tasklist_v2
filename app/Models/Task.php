@@ -230,6 +230,14 @@ class Task extends Model
     }
 
     /**
+     * Determine whether the task is still open after its deadline has passed.
+     */
+    public function isOverdue(): bool
+    {
+        return $this->status !== self::STATUS_DONE && $this->deadline !== null && $this->deadline->lt(today());
+    }
+
+    /**
      * Determine whether the account is currently a PIC of the task.
      */
     public function hasActivePic(Account $account): bool
