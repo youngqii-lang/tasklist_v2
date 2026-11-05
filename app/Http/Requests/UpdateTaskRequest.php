@@ -23,6 +23,10 @@ class UpdateTaskRequest extends FormRequest
             return false;
         }
 
+        if (! $user->can('manage', $task)) {
+            return true;
+        }
+
         $division = $this->filled('division_id') ? Division::find($this->integer('division_id')) : null;
 
         return $division === null || $user->can('changeDivision', [$task, $division]);
@@ -32,22 +36,25 @@ class UpdateTaskRequest extends FormRequest
      * Get the validation rules that apply to the request.
      *
      * Only the fields that are sent are changed; PIC and status have their own endpoints.
+     * A PIC who does not manage the task may not change its division, category or QA requirement.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
+        $isPicOnly = ! $this->user()?->can('manage', $this->task());
+
         return [
             'version' => ['required', 'integer'],
             'title' => ['sometimes', 'required', 'string', 'max:150'],
             'description' => ['sometimes', 'nullable', 'string'],
-            'division_id' => ['sometimes', 'required', 'integer', Rule::exists('divisions', 'id')],
-            'category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('task_categories', 'id')],
+            'division_id' => [Rule::prohibitedIf($isPicOnly), 'sometimes', 'required', 'integer', Rule::exists('divisions', 'id')],
+            'category_id' => [Rule::prohibitedIf($isPicOnly), 'sometimes', 'nullable', 'integer', Rule::exists('task_categories', 'id')],
             'platform_id' => ['sometimes', 'nullable', 'integer', Rule::exists('platforms', 'id')],
             'priority' => ['sometimes', 'required', 'string', Rule::in(Task::PRIORITIES)],
             'start_date' => ['sometimes', 'nullable', 'date'],
             'deadline' => ['sometimes', 'nullable', 'date'],
-            'requires_review' => ['sometimes', 'required', 'boolean'],
+            'requires_review' => [Rule::prohibitedIf($isPicOnly), 'sometimes', 'required', 'boolean'],
         ];
     }
 
@@ -112,6 +119,7 @@ class UpdateTaskRequest extends FormRequest
             'exists' => ':attribute yang dipilih tidak valid.',
             'in' => ':attribute yang dipilih tidak valid.',
             'date' => ':attribute harus berupa tanggal yang valid.',
+            'prohibited' => 'Anda tidak berwenang mengubah :attribute.',
             'version.required' => 'Versi data tugas wajib dikirim.',
         ];
     }

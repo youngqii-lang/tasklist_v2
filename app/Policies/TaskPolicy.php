@@ -55,11 +55,28 @@ class TaskPolicy
     }
 
     /**
-     * Admins, and managers or supervisors of the task's division, may edit the main task information.
+     * Admins, and managers or supervisors of the task's division, fully manage the task.
+     */
+    public function manage(Account $user, Task $task): bool
+    {
+        return $user->hasPermission('task.update_all') && $this->coversDivision($user, $task);
+    }
+
+    /**
+     * Managers of the task may edit it; staff and freelancers only while they are its PIC.
      */
     public function update(Account $user, Task $task): bool
     {
-        return $user->hasPermission('task.update_all') && $this->coversDivision($user, $task);
+        return $this->manage($user, $task)
+            || ($user->hasPermission('task.update_assigned') && $task->hasActivePic($user));
+    }
+
+    /**
+     * Deleting follows the same authority as editing.
+     */
+    public function delete(Account $user, Task $task): bool
+    {
+        return $this->update($user, $task);
     }
 
     /**

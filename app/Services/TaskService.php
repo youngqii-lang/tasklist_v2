@@ -122,6 +122,23 @@ class TaskService
     }
 
     /**
+     * Soft delete a task, keeping who deleted it so its history stays traceable.
+     */
+    public function delete(Account $actor, Task $task, int $version): void
+    {
+        DB::transaction(function () use ($actor, $task, $version) {
+            $task = $task->lockForVersion($version);
+
+            $task->recordActivity($actor, TaskActivity::ACTION_DELETED);
+
+            $task->deleted_by = $actor->id;
+            $task->version++;
+            $task->save();
+            $task->delete();
+        });
+    }
+
+    /**
      * Load everything the task detail panel shows.
      */
     public function loadDetail(Task $task): Task

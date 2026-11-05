@@ -6,7 +6,6 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskActivity;
-use App\Models\TaskAssignment;
 use App\Models\TaskCategory;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -70,10 +69,9 @@ class UpdateTaskTest extends TestCase
         $this->patchTask($manager, ['title' => 'Judul baru'], $otherTask)->assertForbidden();
     }
 
-    public function test_staff_cannot_update_the_main_information(): void
+    public function test_staff_who_is_not_the_pic_cannot_update_the_task(): void
     {
         $employee = Account::factory()->employee()->for($this->division)->create();
-        TaskAssignment::factory()->for($this->task)->for($employee, 'account')->create();
 
         $this->patchTask($employee, ['title' => 'Judul baru'])->assertForbidden();
 
