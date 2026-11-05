@@ -7,6 +7,7 @@ use App\Models\CalendarEvent;
 use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +22,7 @@ class TimelineTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
         $this->travelTo('2026-11-05 10:00:00');
 
         $this->division = Division::factory()->create();
@@ -96,7 +97,7 @@ class TimelineTest extends TestCase
         $response->assertJsonPath('data.tasks.0.id', $ownTask->id)
             ->assertJsonPath('data.tasks.0.can_view_detail', true)
             ->assertJsonPath('data.tasks.1.id', $otherTask->id)
-            ->assertJsonPath('data.tasks.1.can_view_detail', false)
+            ->assertJsonPath('data.tasks.1.can_view_detail', true)
             ->assertJsonMissingPath('data.tasks.1.description')
             ->assertJsonMissingPath('data.tasks.1.pics');
     }

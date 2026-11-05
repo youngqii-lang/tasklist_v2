@@ -282,24 +282,16 @@ class Task extends Model
     /**
      * Limit the query to tasks the account is allowed to see.
      *
-     * Admins see every division, managers their own division, and everyone else only the tasks they are PIC of.
+     * Active accounts with the view permission see every division; others see nothing.
      *
      * @param  Builder<Task>  $query
      */
     #[Scope]
     protected function visibleTo(Builder $query, Account $account): void
     {
-        if ($account->isAdmin()) {
-            return;
+        if (! $account->is_active || ! $account->hasPermission('task.view_all')) {
+            $query->whereRaw('1 = 0');
         }
-
-        if ($account->isManager()) {
-            $query->where('division_id', $account->division_id);
-
-            return;
-        }
-
-        $query->assignedTo($account);
     }
 
     /**

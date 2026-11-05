@@ -19,6 +19,15 @@ class Account extends Authenticatable
     use HasFactory;
 
     /**
+     * The model's default values for attributes, matching the database defaults.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'is_active' => true,
+    ];
+
+    /**
      * Get the role assigned to the account.
      *
      * @return BelongsTo<Role, $this>
@@ -44,6 +53,16 @@ class Account extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role?->code_role === Role::ADMIN;
+    }
+
+    /**
+     * Determine whether the role of the account grants the permission code.
+     *
+     * Permissions are read from the current role, so a role change takes effect immediately.
+     */
+    public function hasPermission(string $code): bool
+    {
+        return (bool) $this->role?->permissions->contains('code', $code);
     }
 
     /**

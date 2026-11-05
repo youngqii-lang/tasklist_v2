@@ -7,6 +7,7 @@ use App\Models\Division;
 use App\Models\Platform;
 use App\Models\Task;
 use App\Models\TaskCategory;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +22,7 @@ class CreateTaskTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
 
         $this->division = Division::factory()->create();
     }
@@ -90,12 +91,11 @@ class CreateTaskTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_staff_and_supervisor_cannot_create_a_task(): void
+    public function test_staff_and_freelance_cannot_create_a_task(): void
     {
         $accounts = [
             Account::factory()->employee()->for($this->division)->create(),
             Account::factory()->freelance()->for($this->division)->create(),
-            Account::factory()->supervisor()->for($this->division)->create(),
         ];
 
         foreach ($accounts as $account) {
@@ -105,6 +105,18 @@ class CreateTaskTest extends TestCase
         }
 
         $this->assertDatabaseCount('tasks', 0);
+    }
+
+    public function test_supervisor_can_create_a_task_for_their_own_division_only(): void
+    {
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
+
+        $this->actingAs($supervisor)->postJson(route('api.tasks.store'), $this->payload())->assertCreated();
+        $this->actingAs($supervisor)
+            ->postJson(route('api.tasks.store'), $this->payload(['division_id' => Division::factory()->create()->id]))
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('tasks', 1);
     }
 
     public function test_guest_cannot_create_a_task(): void

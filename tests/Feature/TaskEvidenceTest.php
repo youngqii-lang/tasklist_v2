@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
 use App\Models\TaskEvidence;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -28,7 +29,7 @@ class TaskEvidenceTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
         Storage::fake('local');
 
         $this->division = Division::factory()->create();
@@ -156,11 +157,15 @@ class TaskEvidenceTest extends TestCase
             ->assertJsonCount(2, 'data.evidences');
     }
 
-    public function test_users_without_access_to_the_task_cannot_see_its_evidence(): void
+    public function test_read_only_users_can_see_evidence_but_not_add_it(): void
     {
         $otherManager = Account::factory()->manager()->create();
+        TaskEvidence::factory()->for($this->task)->create();
 
-        $this->actingAs($otherManager)->getJson(route('api.tasks.evidences.index', $this->task))->assertForbidden();
+        $this->actingAs($otherManager)->getJson(route('api.tasks.evidences.index', $this->task))->assertOk()->assertJsonCount(1, 'data');
+        $this->actingAs($otherManager)
+            ->postJson(route('api.tasks.evidences.store', $this->task), ['type' => 'link', 'url' => 'https://example.com'])
+            ->assertForbidden();
     }
 
     public function test_evidence_file_can_be_downloaded_by_users_with_access(): void
@@ -177,7 +182,7 @@ class TaskEvidenceTest extends TestCase
             ->assertOk()
             ->assertDownload('laporan.pdf');
 
-        $this->actingAs(Account::factory()->manager()->create())
+        $this->actingAs(Account::factory()->manager()->inactive()->create())
             ->getJson(route('api.tasks.evidences.download', [$this->task, $evidence]))
             ->assertForbidden();
     }

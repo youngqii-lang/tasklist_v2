@@ -7,6 +7,7 @@ use App\Models\CalendarEvent;
 use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +22,7 @@ class CalendarTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
         $this->travelTo('2026-11-05 10:00:00');
 
         $this->division = Division::factory()->create();
@@ -66,7 +67,7 @@ class CalendarTest extends TestCase
             ]);
     }
 
-    public function test_deadline_markers_follow_the_task_access_rules(): void
+    public function test_deadline_markers_include_every_division_for_every_role(): void
     {
         $manager = Account::factory()->manager()->for($this->division)->create();
         Task::factory()->for($this->division)->create(['deadline' => '2026-11-10']);
@@ -74,7 +75,7 @@ class CalendarTest extends TestCase
 
         $this->actingAs($manager)
             ->getJson(route('api.calendar.month', ['month' => '2026-11']))
-            ->assertJsonPath('data.deadlines.0.total', 1);
+            ->assertJsonPath('data.deadlines.0.total', 2);
     }
 
     public function test_deadline_list_of_a_date_contains_the_task_fields(): void
@@ -102,7 +103,7 @@ class CalendarTest extends TestCase
             ->assertJsonPath('data.deadlines.0.is_overdue', true);
     }
 
-    public function test_deadline_list_follows_the_access_rules_of_each_role(): void
+    public function test_every_role_sees_the_deadlines_of_every_division_read_only(): void
     {
         $pic = Account::factory()->employee()->for($this->division)->create();
         $assigned = Task::factory()->for($this->division)->create(['deadline' => '2026-11-10']);
@@ -110,31 +111,35 @@ class CalendarTest extends TestCase
         $sameDivision = Task::factory()->for($this->division)->create(['deadline' => '2026-11-10']);
         $otherDivision = Task::factory()->create(['deadline' => '2026-11-10']);
 
-        $expectations = [
-            [Account::factory()->admin()->create(), [$assigned->id, $sameDivision->id, $otherDivision->id]],
-            [Account::factory()->manager()->for($this->division)->create(), [$assigned->id, $sameDivision->id]],
-            [$pic, [$assigned->id]],
-        ];
+        $accounts = [Account::factory()->admin()->create(), Account::factory()->manager()->for($this->division)->create(), $pic];
 
-        foreach ($expectations as [$account, $expectedIds]) {
+        foreach ($accounts as $account) {
             $ids = collect($this->actingAs($account)
                 ->getJson(route('api.calendar.deadlines', ['date' => '2026-11-10']))
                 ->json('data.deadlines'))->pluck('id')->all();
 
-            $this->assertEqualsCanonicalizing($expectedIds, $ids);
+            $this->assertEqualsCanonicalizing([$assigned->id, $sameDivision->id, $otherDivision->id], $ids);
         }
+
+        $deadlines = collect($this->actingAs($pic)
+            ->getJson(route('api.calendar.deadlines', ['date' => '2026-11-10']))
+            ->json('data.deadlines'))->keyBy('id');
+
+        $this->assertFalse($deadlines[$otherDivision->id]['abilities']['update']);
     }
 
-    public function test_division_filter_cannot_widen_access(): void
+    public function test_division_filter_narrows_the_deadline_list(): void
     {
         $manager = Account::factory()->manager()->for($this->division)->create();
         $otherDivision = Division::factory()->create();
-        Task::factory()->for($otherDivision)->create(['deadline' => '2026-11-10']);
+        $match = Task::factory()->for($otherDivision)->create(['deadline' => '2026-11-10']);
+        Task::factory()->for($this->division)->create(['deadline' => '2026-11-10']);
 
         $this->actingAs($manager)
             ->getJson(route('api.calendar.deadlines', ['date' => '2026-11-10', 'division_id' => $otherDivision->id]))
             ->assertOk()
-            ->assertJsonPath('data.deadlines', []);
+            ->assertJsonCount(1, 'data.deadlines')
+            ->assertJsonPath('data.deadlines.0.id', $match->id);
     }
 
     public function test_empty_date_returns_the_no_deadline_message(): void

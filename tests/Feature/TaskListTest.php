@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,7 +21,7 @@ class TaskListTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
 
         $this->division = Division::factory()->create();
     }
@@ -46,26 +47,37 @@ class TaskListTest extends TestCase
         $this->assertEqualsCanonicalizing($tasks->modelKeys(), $this->listedIds($admin));
     }
 
-    public function test_manager_only_sees_tasks_of_their_division(): void
+    public function test_every_role_sees_the_tasks_of_every_division(): void
     {
-        $manager = Account::factory()->manager()->for($this->division)->create();
         $ownTask = Task::factory()->for($this->division)->create();
-        Task::factory()->create();
+        $otherTask = Task::factory()->create();
 
-        $this->assertSame([$ownTask->id], $this->listedIds($manager));
+        foreach (['manager', 'supervisor', 'employee', 'freelance'] as $role) {
+            $account = Account::factory()->{$role}()->for($this->division)->create();
+
+            $this->assertEqualsCanonicalizing([$ownTask->id, $otherTask->id], $this->listedIds($account), "Role {$role} sees the wrong tasks.");
+        }
     }
 
-    public function test_staff_and_supervisor_only_see_tasks_they_are_currently_pic_of(): void
+    public function test_tasks_outside_the_users_authority_are_read_only(): void
     {
-        foreach (['employee', 'freelance', 'supervisor'] as $role) {
-            $account = Account::factory()->{$role}()->for($this->division)->create();
-            $assignedTask = Task::factory()->for($this->division)->create();
-            $formerTask = Task::factory()->for($this->division)->create();
-            TaskAssignment::factory()->for($assignedTask)->for($account, 'account')->create();
-            TaskAssignment::factory()->unassigned()->for($formerTask)->for($account, 'account')->create();
+        $employee = Account::factory()->employee()->for($this->division)->create();
+        $task = Task::factory()->for($this->division)->create();
+        TaskAssignment::factory()->for(Task::factory()->create())->for($employee, 'account')->create();
 
-            $this->assertSame([$assignedTask->id], $this->listedIds($account), "Role {$role} sees the wrong tasks.");
-        }
+        $abilities = collect($this->actingAs($employee)->getJson(route('api.tasks.index'))->json('data'))
+            ->firstWhere('id', $task->id)['abilities'];
+
+        $this->assertFalse($abilities['update']);
+        $this->assertFalse($abilities['assign']);
+        $this->assertSame([], $abilities['transitions']);
+    }
+
+    public function test_deactivated_account_cannot_list_tasks(): void
+    {
+        $this->actingAs(Account::factory()->employee()->inactive()->create())
+            ->getJson(route('api.tasks.index'))
+            ->assertForbidden();
     }
 
     public function test_task_card_contains_the_board_fields(): void
@@ -136,7 +148,7 @@ class TaskListTest extends TestCase
             ->assertJsonPath('meta.total', 3);
     }
 
-    public function test_status_counts_follow_the_visibility_of_the_account(): void
+    public function test_status_counts_cover_every_division(): void
     {
         $manager = Account::factory()->manager()->for($this->division)->create();
         Task::factory()->for($this->division)->create(['status' => 'todo']);
@@ -144,7 +156,7 @@ class TaskListTest extends TestCase
 
         $this->actingAs($manager)
             ->getJson(route('api.tasks.index'))
-            ->assertJsonPath('meta.status_counts.todo', 1);
+            ->assertJsonPath('meta.status_counts.todo', 4);
     }
 
     public function test_priority_is_sorted_by_severity(): void
