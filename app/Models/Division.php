@@ -23,4 +23,14 @@ class Division extends Model
     {
         return $this->hasMany(Account::class);
     }
+
+    /**
+     * Get the tasks owned by this division.
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
 }

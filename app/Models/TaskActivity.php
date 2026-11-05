@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\TaskActivityFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable(['task_id', 'account_id', 'action', 'changes'])]
+class TaskActivity extends Model
+{
+    /** @use HasFactory<TaskActivityFactory> */
+    use HasFactory;
+
+    /**
+     * Activities are append-only, so they have no "updated at" column.
+     */
+    public const UPDATED_AT = null;
+
+    /**
+     * Get the task the activity belongs to.
+     *
+     * @return BelongsTo<Task, $this>
+     */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
+    }
+
+    /**
+     * Get the account that performed the activity.
+     *
+     * @return BelongsTo<Account, $this>
+     */
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'changes' => 'array',
+        ];
+    }
+}

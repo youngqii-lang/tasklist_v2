@@ -6,6 +6,7 @@ use Database\Factories\RoleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['code_role', 'name'])]
@@ -14,9 +15,15 @@ class Role extends Model
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 
+    public const string ADMIN = 'admin';
+
     public const string MANAGER = 'manager';
 
+    public const string SUPERVISOR = 'supervisor';
+
     public const string EMPLOYEE = 'employee';
+
+    public const string FREELANCE = 'freelance';
 
     /**
      * Get the accounts that have this role.
@@ -26,5 +33,15 @@ class Role extends Model
     public function accounts(): HasMany
     {
         return $this->hasMany(Account::class);
+    }
+
+    /**
+     * Get the permissions granted to this role.
+     *
+     * @return BelongsToMany<Permission, $this>
+     */
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'role_permissions');
     }
 }
