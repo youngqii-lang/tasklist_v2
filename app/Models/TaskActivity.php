@@ -25,6 +25,8 @@ class TaskActivity extends Model
 
     public const string ACTION_STATUS_CHANGED = 'status_changed';
 
+    public const string ACTION_EVIDENCE_ADDED = 'evidence_added';
+
     /**
      * Display labels for every recorded action.
      *
@@ -34,6 +36,7 @@ class TaskActivity extends Model
         self::ACTION_UPDATED => 'Informasi tugas diperbarui',
         self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
         self::ACTION_STATUS_CHANGED => 'Status tugas diubah',
+        self::ACTION_EVIDENCE_ADDED => 'Evidence ditambahkan',
     ];
 
     /**

@@ -53,6 +53,7 @@ class TaskResource extends JsonResource
                 'fullname' => $pic->fullname,
                 'username' => $pic->username,
             ])->all()),
+            'evidences' => TaskEvidenceResource::collection($this->whenLoaded('evidences')),
             'activities' => TaskActivityResource::collection($this->whenLoaded('activities')),
             'version' => $this->version,
             'completed_at' => $this->completed_at?->toIso8601String(),
@@ -61,6 +62,7 @@ class TaskResource extends JsonResource
             'abilities' => [
                 'update' => (bool) $request->user()?->can('update', $this->resource),
                 'assign' => (bool) $request->user()?->can('assign', $this->resource),
+                'add_evidence' => (bool) $request->user()?->can('addEvidence', $this->resource),
                 'transitions' => $request->user()
                     ? app(TaskWorkflowService::class)->availableTransitions($request->user(), $this->resource)
                     : [],

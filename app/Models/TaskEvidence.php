@@ -17,6 +17,18 @@ class TaskEvidence extends Model
     /** @use HasFactory<TaskEvidenceFactory> */
     use HasFactory, SoftDeletes;
 
+    public const string TYPE_FILE = 'file';
+
+    public const string TYPE_LINK = 'link';
+
+    /**
+     * Get the name to show for the evidence: the file name or the link.
+     */
+    public function displayName(): string
+    {
+        return $this->type === self::TYPE_FILE ? (string) $this->file_name : (string) $this->url;
+    }
+
     /**
      * Get the task the evidence belongs to.
      *

@@ -125,6 +125,13 @@ class TaskWorkflowService
                 : 'Tugas ini tidak wajib QA, selesaikan langsung ke Done.');
         }
 
+        $isSubmission = $task->status === Task::STATUS_IN_PROGRESS
+            && in_array($toStatus, [Task::STATUS_READY_REVIEW, Task::STATUS_DONE], true);
+
+        if ($isSubmission && $task->evidence_required && ! $task->evidences()->exists()) {
+            throw new InvalidTaskTransitionException('Tugas ini wajib melampirkan evidence sebelum dikirim.');
+        }
+
         if ($toStatus === Task::STATUS_TODO && ($task->deadline === null || ! $task->pics()->exists())) {
             throw new InvalidTaskTransitionException('Tugas wajib memiliki PIC dan deadline sebelum dipindahkan ke To Do.');
         }

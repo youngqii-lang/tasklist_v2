@@ -58,6 +58,14 @@ class TaskPolicy
     }
 
     /**
+     * Only a current PIC may submit evidence of the work.
+     */
+    public function addEvidence(Account $user, Task $task): bool
+    {
+        return $task->hasActivePic($user);
+    }
+
+    /**
      * Only admins may move a task to another division.
      */
     public function changeDivision(Account $user, Task $task, Division $division): bool
