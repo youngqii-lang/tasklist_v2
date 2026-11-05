@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['task_id', 'author_id', 'parent_comment_id', 'content'])]
+#[Fillable(['task_id', 'author_id', 'author_role', 'parent_comment_id', 'content'])]
 class TaskComment extends Model
 {
     /** @use HasFactory<TaskCommentFactory> */
