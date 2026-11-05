@@ -37,6 +37,7 @@ class StoreTaskEvidenceRequest extends FormRequest
                 'mimes:'.$extensions,
             ],
             'url' => ['exclude_unless:type,'.TaskEvidence::TYPE_LINK, 'required', 'string', 'max:2048', 'url:http,https'],
+            'title' => ['exclude_unless:type,'.TaskEvidence::TYPE_LINK, 'nullable', 'string', 'max:150'],
             'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
@@ -56,6 +57,7 @@ class StoreTaskEvidenceRequest extends FormRequest
             'file.max' => 'Ukuran file maksimal :max KB.',
             'file.extensions' => 'Format file tidak diizinkan.',
             'file.mimes' => 'Format file tidak diizinkan.',
+            'title.max' => 'Judul tautan maksimal :max karakter.',
             'url.url' => 'Tautan harus berupa URL yang valid (http atau https).',
         ];
     }
@@ -71,6 +73,7 @@ class StoreTaskEvidenceRequest extends FormRequest
             'type' => 'Jenis evidence',
             'file' => 'File',
             'url' => 'Tautan',
+            'title' => 'Judul tautan',
             'note' => 'Catatan',
         ];
     }
