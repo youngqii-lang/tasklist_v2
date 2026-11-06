@@ -11,6 +11,6 @@ class TaskReviewSettingsLockedException extends UnprocessableEntityHttpException
 {
     public function __construct()
     {
-        parent::__construct('Kategori dan kewajiban QA tidak dapat diubah saat tugas sedang diperiksa atau sudah selesai.');
+        parent::__construct('Kategori dan kewajiban review tidak dapat diubah saat tugas sedang diperiksa atau sudah selesai.');
     }
 }

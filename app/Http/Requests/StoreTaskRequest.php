@@ -99,7 +99,7 @@ class StoreTaskRequest extends FormRequest
             'status' => 'Status',
             'start_date' => 'Tanggal mulai',
             'deadline' => 'Deadline',
-            'requires_review' => 'Kewajiban QA',
+            'requires_review' => 'Kewajiban review',
             'pic_ids' => 'PIC',
             'pic_ids.*' => 'PIC',
         ];

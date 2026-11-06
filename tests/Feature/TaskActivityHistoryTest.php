@@ -50,6 +50,8 @@ class TaskActivityHistoryTest extends TestCase
             [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_READY_REVIEW]],
             [$manager, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_ON_REVIEW]],
             [$manager, 'postJson', 'api.tasks.reviews.store', ['decision' => 'revision_requested', 'note' => 'Ganti foto']],
+            [$manager, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_TODO]],
+            [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_IN_PROGRESS]],
             [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_READY_REVIEW]],
             [$manager, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_ON_REVIEW]],
             [$manager, 'postJson', 'api.tasks.reviews.store', ['decision' => 'approved']],
@@ -68,6 +70,8 @@ class TaskActivityHistoryTest extends TestCase
                 TaskActivity::ACTION_APPROVED,
                 TaskActivity::ACTION_STATUS_CHANGED,
                 TaskActivity::ACTION_RESUBMITTED,
+                TaskActivity::ACTION_STATUS_CHANGED,
+                TaskActivity::ACTION_STATUS_CHANGED,
                 TaskActivity::ACTION_REVISION_REQUESTED,
                 TaskActivity::ACTION_STATUS_CHANGED,
                 TaskActivity::ACTION_SUBMITTED,
@@ -79,8 +83,8 @@ class TaskActivityHistoryTest extends TestCase
             ])
             ->assertJsonPath('data.0.label', 'Tugas disetujui')
             ->assertJsonPath('data.0.account.id', $manager->id)
-            ->assertJsonPath('data.10.changes.status.to', Task::STATUS_TODO)
-            ->assertJsonPath('data.10.changes.pics.to.0.id', $pic->id);
+            ->assertJsonPath('data.12.changes.status.to', Task::STATUS_TODO)
+            ->assertJsonPath('data.12.changes.pics.to.0.id', $pic->id);
     }
 
     public function test_each_activity_shows_who_when_and_what_changed(): void

@@ -82,11 +82,11 @@ class TaskReviewTest extends TestCase
         $this->assertSame(TaskActivity::ACTION_APPROVED, TaskActivity::sole()->action);
     }
 
-    public function test_revision_returns_the_task_to_process_with_a_note(): void
+    public function test_revision_returns_the_task_to_backlog_with_a_note(): void
     {
         $this->decide($this->manager, ['decision' => 'revision_requested', 'note' => 'Ukuran gambar salah.'])
             ->assertOk()
-            ->assertJsonPath('data.status', Task::STATUS_IN_PROGRESS)
+            ->assertJsonPath('data.status', Task::STATUS_BACKLOG)
             ->assertJsonPath('data.reviews.0.note', 'Ukuran gambar salah.');
 
         $activity = TaskActivity::sole();
@@ -104,13 +104,13 @@ class TaskReviewTest extends TestCase
         $this->assertDatabaseCount('task_reviews', 0);
     }
 
-    public function test_decision_is_only_possible_when_the_task_is_on_qa(): void
+    public function test_decision_is_only_possible_when_the_task_is_on_review(): void
     {
         $this->task->update(['status' => Task::STATUS_READY_REVIEW]);
 
         $this->decide($this->manager, ['decision' => 'approved'])
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Keputusan review hanya dapat diberikan pada tugas berstatus On QA.');
+            ->assertJsonPath('message', 'Keputusan review hanya dapat diberikan pada tugas berstatus On Review.');
     }
 
     public function test_staff_cannot_review_their_own_task(): void
@@ -130,12 +130,18 @@ class TaskReviewTest extends TestCase
     {
         $this->decide($this->manager, ['decision' => 'revision_requested', 'note' => 'Revisi pertama'])->assertOk();
 
-        $this->actingAs($this->pic)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 2])
-            ->assertOk();
-        $this->actingAs($this->manager)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_ON_REVIEW, 'version' => 3])
-            ->assertOk();
+        $steps = [
+            [$this->manager, Task::STATUS_TODO],
+            [$this->pic, Task::STATUS_IN_PROGRESS],
+            [$this->pic, Task::STATUS_READY_REVIEW],
+            [$this->manager, Task::STATUS_ON_REVIEW],
+        ];
+
+        foreach ($steps as [$account, $status]) {
+            $this->actingAs($account)
+                ->patchJson(route('api.tasks.status.update', $this->task), ['status' => $status, 'version' => $this->task->fresh()->version])
+                ->assertOk();
+        }
 
         $this->decide($this->manager, ['decision' => 'approved'])->assertOk()->assertJsonPath('data.status', Task::STATUS_DONE);
 

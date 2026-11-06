@@ -213,12 +213,12 @@ class TaskEvidenceTest extends TestCase
             ->assertOk();
     }
 
-    public function test_task_with_optional_evidence_can_be_finished_without_it(): void
+    public function test_task_with_optional_evidence_can_be_submitted_without_it(): void
     {
         $this->task->update(['requires_review' => false, 'evidence_required' => false]);
 
         $this->actingAs($this->pic)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_DONE, 'version' => 1])
+            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 1])
             ->assertOk();
     }
 
@@ -229,7 +229,7 @@ class TaskEvidenceTest extends TestCase
         $firstEvidence = TaskEvidence::factory()->for($this->task)->create();
 
         $this->actingAs($manager)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_IN_PROGRESS, 'version' => 1, 'note' => 'Revisi'])
+            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_BACKLOG, 'version' => 1, 'note' => 'Revisi'])
             ->assertOk();
 
         $this->actingAs($this->pic)
