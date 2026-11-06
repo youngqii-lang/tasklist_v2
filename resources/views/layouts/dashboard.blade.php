@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="bg-motif min-h-screen lg:pl-72">
+    <div class="bg-[#faf7f7] min-h-screen lg:pl-72">
         <x-sidebar />
 
         <header class="sticky top-0 z-20 flex items-center gap-3 border-b border-burgundy-100 bg-white/80 px-4 py-3 backdrop-blur lg:hidden">
