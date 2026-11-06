@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
 use App\Models\TaskCategory;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,7 +26,7 @@ class TaskDetailTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
 
         $this->division = Division::factory()->create();
         $this->task = Task::factory()->for($this->division)->create();
@@ -86,28 +87,38 @@ class TaskDetailTest extends TestCase
             ->assertJsonPath('data.activities.1.id', $older->id);
     }
 
-    public function test_manager_can_open_tasks_of_their_division_only(): void
+    public function test_manager_can_open_tasks_of_another_division_read_only(): void
     {
         $manager = Account::factory()->manager()->for($this->division)->create();
         $otherTask = Task::factory()->create();
 
-        $this->actingAs($manager)->getJson(route('api.tasks.show', $this->task))->assertOk();
-        $this->actingAs($manager)->getJson(route('api.tasks.show', $otherTask))->assertForbidden();
+        $this->actingAs($manager)->getJson(route('api.tasks.show', $this->task))->assertJsonPath('data.abilities.update', true);
+        $this->actingAs($manager)
+            ->getJson(route('api.tasks.show', $otherTask))
+            ->assertOk()
+            ->assertJsonPath('data.abilities.update', false)
+            ->assertJsonPath('data.abilities.assign', false)
+            ->assertJsonPath('data.abilities.review', false)
+            ->assertJsonPath('data.abilities.transitions', []);
     }
 
-    public function test_staff_can_only_open_tasks_they_are_pic_of(): void
+    public function test_staff_can_open_tasks_of_other_users_read_only(): void
     {
         $employee = Account::factory()->employee()->for($this->division)->create();
-        $otherTask = Task::factory()->for($this->division)->create();
-        TaskAssignment::factory()->for($this->task)->for($employee, 'account')->create();
-
-        $this->actingAs($employee)
-            ->getJson(route('api.tasks.show', $this->task))
-            ->assertOk()
-            ->assertJsonPath('data.abilities.update', false);
+        $otherTask = Task::factory()->create();
 
         $this->actingAs($employee)
             ->getJson(route('api.tasks.show', $otherTask))
+            ->assertOk()
+            ->assertJsonPath('data.abilities.update', false)
+            ->assertJsonPath('data.abilities.add_evidence', false)
+            ->assertJsonPath('data.abilities.transitions', []);
+    }
+
+    public function test_deactivated_account_cannot_open_a_task(): void
+    {
+        $this->actingAs(Account::factory()->admin()->inactive()->create())
+            ->getJson(route('api.tasks.show', $this->task))
             ->assertForbidden()
             ->assertJsonPath('message', 'Anda tidak memiliki akses untuk melakukan tindakan ini.');
     }

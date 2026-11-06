@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Platform;
 use App\Models\TaskCategory;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,7 +19,7 @@ class TaskOptionTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
     }
 
     public function test_admin_receives_every_division_and_the_master_data(): void

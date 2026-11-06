@@ -7,6 +7,7 @@ use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -26,7 +27,7 @@ class TaskStatusWorkflowTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
 
         $this->division = Division::factory()->create();
         $this->manager = Account::factory()->manager()->for($this->division)->create();

@@ -7,6 +7,7 @@ use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,7 +22,7 @@ class TaskActivityHistoryTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, PermissionSeeder::class]);
 
         $this->division = Division::factory()->create();
     }
@@ -109,18 +110,19 @@ class TaskActivityHistoryTest extends TestCase
         $this->actingAs($admin)->getJson(route('api.tasks.activities.index', $task))->assertOk()->assertJsonPath('data', []);
     }
 
-    public function test_history_follows_the_task_access_rules(): void
+    public function test_history_is_visible_to_every_active_account(): void
     {
         $task = Task::factory()->for($this->division)->create();
-        $pic = Account::factory()->employee()->for($this->division)->create();
-        TaskAssignment::factory()->for($task)->for($pic, 'account')->create();
 
-        $this->actingAs(Account::factory()->admin()->create())->getJson(route('api.tasks.activities.index', $task))->assertOk();
-        $this->actingAs(Account::factory()->manager()->for($this->division)->create())->getJson(route('api.tasks.activities.index', $task))->assertOk();
-        $this->actingAs($pic)->getJson(route('api.tasks.activities.index', $task))->assertOk();
+        foreach (['admin', 'manager', 'supervisor', 'employee', 'freelance'] as $role) {
+            $this->actingAs(Account::factory()->{$role}()->create())
+                ->getJson(route('api.tasks.activities.index', $task))
+                ->assertOk();
+        }
 
-        $this->actingAs(Account::factory()->manager()->create())->getJson(route('api.tasks.activities.index', $task))->assertForbidden();
-        $this->actingAs(Account::factory()->employee()->for($this->division)->create())->getJson(route('api.tasks.activities.index', $task))->assertForbidden();
+        $this->actingAs(Account::factory()->employee()->inactive()->create())
+            ->getJson(route('api.tasks.activities.index', $task))
+            ->assertForbidden();
     }
 
     public function test_history_cannot_be_changed_through_the_api(): void

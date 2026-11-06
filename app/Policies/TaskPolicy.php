@@ -6,63 +6,76 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 
+/**
+ * Task permissions follow the role permissions in role_permissions (TASK-12 RBAC matrix).
+ *
+ * Admins act across every division; other roles only within the division they belong to.
+ */
 class TaskPolicy
 {
     /**
-     * Every signed-in account may open the Tasklist; the visible tasks are limited by the query scope.
+     * Deactivated accounts may not do anything in the Tasklist.
+     */
+    public function before(Account $user): ?bool
+    {
+        return $user->is_active ? null : false;
+    }
+
+    /**
+     * Every active account with the view permission sees the tasks of every division.
      */
     public function viewAny(Account $user): bool
     {
-        return true;
+        return $user->hasPermission('task.view_all');
     }
 
     /**
-     * Admins see every task, managers the tasks of their division, and everyone else only the tasks they are PIC of.
+     * Seeing a task never grants the right to change it.
      */
     public function view(Account $user, Task $task): bool
     {
-        return $this->manages($user, $task) || $task->hasActivePic($user);
+        return $user->hasPermission('task.view_all');
     }
 
     /**
-     * Admins may create tasks for every division; managers only for their own division.
-     * Without a division, only the role is checked.
+     * Admins may create tasks for every division; managers and supervisors only for their own division.
+     * Without a division, only the permission is checked.
      */
     public function create(Account $user, ?Division $division = null): bool
     {
+        if (! $user->hasPermission('task.create')) {
+            return false;
+        }
+
         if ($user->isAdmin()) {
             return true;
         }
 
-        if (! $user->isManager() || $user->division_id === null) {
-            return false;
-        }
-
-        return $division === null || $user->division_id === $division->id;
+        return $user->division_id !== null && ($division === null || $user->division_id === $division->id);
     }
 
     /**
-     * Only admins and the manager of the task's division may edit the main task information.
+     * Admins, and managers or supervisors of the task's division, may edit the main task information.
      */
     public function update(Account $user, Task $task): bool
     {
-        return $this->manages($user, $task);
+        return $user->hasPermission('task.update_all') && $this->coversDivision($user, $task);
     }
 
     /**
-     * Admins may assign or forward the PIC of every task; managers only within their own division.
+     * Assigning or forwarding the PIC is limited to the division the user manages.
      */
     public function assign(Account $user, Task $task): bool
     {
-        return $this->manages($user, $task);
+        return $user->hasPermission('task.assign') && $this->coversDivision($user, $task);
     }
 
     /**
-     * Admins may review every task; managers only the tasks of their own division.
+     * Reviewing and approving is limited to the division the user manages.
      */
     public function review(Account $user, Task $task): bool
     {
-        return $this->manages($user, $task);
+        return $user->hasPermission('task.review') && $this->coversDivision($user, $task);
     }
 
     /**
@@ -82,14 +95,14 @@ class TaskPolicy
     }
 
     /**
-     * Admins manage every task; managers only the tasks of their own division.
+     * Admins cover every division; everyone else only their own division.
      */
-    protected function manages(Account $user, Task $task): bool
+    protected function coversDivision(Account $user, Task $task): bool
     {
         if ($user->isAdmin()) {
             return true;
         }
 
-        return $user->isManager() && $user->division_id !== null && $user->division_id === $task->division_id;
+        return $user->division_id !== null && $user->division_id === $task->division_id;
     }
 }
