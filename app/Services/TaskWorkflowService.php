@@ -158,7 +158,7 @@ class TaskWorkflowService
     {
         return match ($allowedBy) {
             self::BY_PIC => $task->hasActivePic($actor),
-            self::BY_MANAGER => Gate::forUser($actor)->allows('update', $task),
+            self::BY_MANAGER => Gate::forUser($actor)->allows('manage', $task),
         };
     }
 

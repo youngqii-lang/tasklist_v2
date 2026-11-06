@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DestroyTaskRequest;
 use App\Http\Requests\ListTasksRequest;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
@@ -60,5 +61,15 @@ class TaskController extends Controller
         $task = $taskService->update($request->user(), $task, $request->validated());
 
         return (new TaskResource($task))->additional(['message' => 'Tugas berhasil diperbarui.']);
+    }
+
+    /**
+     * Soft delete a task.
+     */
+    public function destroy(DestroyTaskRequest $request, Task $task, TaskService $taskService): JsonResponse
+    {
+        $taskService->delete($request->user(), $task, $request->integer('version'));
+
+        return response()->json(['message' => 'Tugas berhasil dihapus.']);
     }
 }

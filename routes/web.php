@@ -33,7 +33,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/calendar', [CalendarController::class, 'month'])->name('calendar.month');
         Route::get('/calendar/deadlines', [CalendarController::class, 'deadlines'])->name('calendar.deadlines');
         Route::get('/tasks/summary', TaskSummaryController::class)->name('tasks.summary');
-        Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update'])->whereNumber('task');
+        Route::apiResource('tasks', TaskController::class)->whereNumber('task');
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
         Route::patch('/tasks/{task}/status', [TaskStatusController::class, 'update'])->whereNumber('task')->name('tasks.status.update');
 

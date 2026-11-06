@@ -23,6 +23,8 @@ class TaskActivity extends Model
 
     public const string ACTION_UPDATED = 'updated';
 
+    public const string ACTION_DELETED = 'deleted';
+
     public const string ACTION_PIC_CHANGED = 'pic_changed';
 
     public const string ACTION_STATUS_CHANGED = 'status_changed';
@@ -45,6 +47,7 @@ class TaskActivity extends Model
     public const array ACTION_LABELS = [
         self::ACTION_CREATED => 'Tugas dibuat',
         self::ACTION_UPDATED => 'Informasi tugas diperbarui',
+        self::ACTION_DELETED => 'Tugas dihapus',
         self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
         self::ACTION_STATUS_CHANGED => 'Status tugas diubah',
         self::ACTION_EVIDENCE_ADDED => 'Evidence ditambahkan',
