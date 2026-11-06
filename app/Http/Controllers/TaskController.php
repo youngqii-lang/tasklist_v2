@@ -2,16 +2,30 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ListTasksRequest;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Resources\TaskResource;
 use App\Models\Division;
 use App\Models\Task;
+use App\Services\TaskListService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 
 class TaskController extends Controller
 {
+    /**
+     * List the tasks for the Board and Table views, with the per-status counts of the same filters.
+     */
+    public function index(ListTasksRequest $request, TaskListService $taskListService): AnonymousResourceCollection
+    {
+        $filters = $request->validated();
+
+        return TaskResource::collection($taskListService->paginate($request->user(), $filters))
+            ->additional(['meta' => ['status_counts' => $taskListService->statusCounts($request->user(), $filters)]]);
+    }
+
     /**
      * Store a newly created task and return it as JSON for the frontend.
      */
