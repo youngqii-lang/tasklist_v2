@@ -24,13 +24,13 @@ class TaskOptionController extends Controller
     }
 
     /**
-     * Return the accounts that can be chosen as PIC for a division.
+     * Return the accounts that can be chosen as PIC. Without a division, admins receive the staff of every division.
      */
     public function pics(ListPicOptionsRequest $request, TaskOptionService $taskOptionService): JsonResponse
     {
-        $divisionId = $request->integer('division_id');
+        $divisionId = $request->filled('division_id') ? $request->integer('division_id') : null;
 
-        Gate::authorize('create', [Task::class, Division::findOrFail($divisionId)]);
+        Gate::authorize('create', [Task::class, $divisionId === null ? null : Division::findOrFail($divisionId)]);
 
         $pics = $taskOptionService->picOptions($divisionId)->map(fn (Account $account) => [
             'id' => $account->id,

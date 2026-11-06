@@ -96,13 +96,24 @@ class TaskOptionTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pic_options_require_a_valid_division(): void
+    public function test_manager_must_choose_a_division_for_pic_options(): void
     {
-        $admin = Account::factory()->admin()->create();
+        $manager = Account::factory()->manager()->create();
 
-        $this->actingAs($admin)
+        $this->actingAs($manager)
             ->getJson(route('api.task-options.pics'))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['division_id' => 'Divisi wajib diisi.']);
+    }
+
+    public function test_admin_receives_staff_of_every_division_without_a_division_filter(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        Account::factory()->employee()->count(2)->create();
+
+        $this->actingAs($admin)
+            ->getJson(route('api.task-options.pics'))
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
     }
 }
