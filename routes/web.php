@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\TaskActivityController;
+use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\TaskOptionController;
@@ -39,6 +40,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/tasks/{task}/preview', [TaskController::class, 'preview'])->whereNumber('task')->name('tasks.preview');
         Route::get('/tasks/{task}/activities', [TaskActivityController::class, 'index'])->whereNumber('task')->name('tasks.activities.index');
+        Route::get('/tasks/{task}/comments', [TaskCommentController::class, 'index'])->whereNumber('task')->name('tasks.comments.index');
+        Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store'])->whereNumber('task')->name('tasks.comments.store');
         Route::get('/tasks/{task}/reviews', [TaskReviewController::class, 'index'])->whereNumber('task')->name('tasks.reviews.index');
         Route::post('/tasks/{task}/reviews', [TaskReviewController::class, 'store'])->whereNumber('task')->name('tasks.reviews.store');
 

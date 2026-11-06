@@ -96,6 +96,14 @@ class TaskPolicy
     }
 
     /**
+     * Reviewers of the task and its current PIC may take part in the discussion; others read only.
+     */
+    public function comment(Account $user, Task $task): bool
+    {
+        return $this->review($user, $task) || $task->hasActivePic($user);
+    }
+
+    /**
      * Only a current PIC may submit evidence of the work.
      */
     public function addEvidence(Account $user, Task $task): bool

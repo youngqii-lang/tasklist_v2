@@ -67,6 +67,7 @@ class TaskResource extends JsonResource
                 'assign' => (bool) $request->user()?->can('assign', $this->resource),
                 'add_evidence' => (bool) $request->user()?->can('addEvidence', $this->resource),
                 'review' => (bool) $request->user()?->can('review', $this->resource),
+                'comment' => $this->status !== Task::STATUS_DONE && (bool) $request->user()?->can('comment', $this->resource),
                 'transitions' => $request->user()
                     ? app(TaskWorkflowService::class)->availableTransitions($request->user(), $this->resource)
                     : [],
