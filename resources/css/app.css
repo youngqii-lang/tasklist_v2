@@ -18,15 +18,3 @@
     --color-burgundy-800: #560016;
     --color-burgundy-900: #400010;
 }
-
-/* Soft dotted background motif with a faint burgundy tint. */
-@utility bg-motif {
-    background-color: #faf7f7;
-    background-image:
-        radial-gradient(color-mix(in oklab, var(--color-burgundy-600) 14%, transparent) 1px, transparent 1.5px),
-        radial-gradient(color-mix(in oklab, var(--color-burgundy-600) 7%, transparent) 1px, transparent 1.5px);
-    background-size: 22px 22px;
-    background-position:
-        0 0,
-        11px 11px;
-}
