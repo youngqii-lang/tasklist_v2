@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DivisionController;
+use App\Http\Controllers\TaskActivityController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\TaskOptionController;
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
         Route::patch('/tasks/{task}/status', [TaskStatusController::class, 'update'])->whereNumber('task')->name('tasks.status.update');
 
+        Route::get('/tasks/{task}/activities', [TaskActivityController::class, 'index'])->whereNumber('task')->name('tasks.activities.index');
         Route::get('/tasks/{task}/reviews', [TaskReviewController::class, 'index'])->whereNumber('task')->name('tasks.reviews.index');
         Route::post('/tasks/{task}/reviews', [TaskReviewController::class, 'store'])->whereNumber('task')->name('tasks.reviews.store');
 

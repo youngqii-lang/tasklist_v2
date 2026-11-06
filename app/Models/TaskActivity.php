@@ -19,6 +19,8 @@ class TaskActivity extends Model
      */
     public const UPDATED_AT = null;
 
+    public const string ACTION_CREATED = 'created';
+
     public const string ACTION_UPDATED = 'updated';
 
     public const string ACTION_PIC_CHANGED = 'pic_changed';
@@ -26,6 +28,10 @@ class TaskActivity extends Model
     public const string ACTION_STATUS_CHANGED = 'status_changed';
 
     public const string ACTION_EVIDENCE_ADDED = 'evidence_added';
+
+    public const string ACTION_SUBMITTED = 'submitted';
+
+    public const string ACTION_RESUBMITTED = 'resubmitted';
 
     public const string ACTION_APPROVED = 'approved';
 
@@ -37,10 +43,13 @@ class TaskActivity extends Model
      * @var array<string, string>
      */
     public const array ACTION_LABELS = [
+        self::ACTION_CREATED => 'Tugas dibuat',
         self::ACTION_UPDATED => 'Informasi tugas diperbarui',
         self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
         self::ACTION_STATUS_CHANGED => 'Status tugas diubah',
         self::ACTION_EVIDENCE_ADDED => 'Evidence ditambahkan',
+        self::ACTION_SUBMITTED => 'Hasil kerja dikirim untuk diperiksa',
+        self::ACTION_RESUBMITTED => 'Hasil revisi dikirim ulang',
         self::ACTION_APPROVED => 'Tugas disetujui',
         self::ACTION_REVISION_REQUESTED => 'Revisi diminta',
     ];

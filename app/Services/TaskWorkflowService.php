@@ -108,11 +108,7 @@ class TaskWorkflowService
                 $task->reviews()->create(['reviewer_id' => $actor->id, 'decision' => $decision, 'note' => $note]);
             }
 
-            $task->recordActivity($actor, match ($decision) {
-                TaskReview::DECISION_APPROVED => TaskActivity::ACTION_APPROVED,
-                TaskReview::DECISION_REVISION_REQUESTED => TaskActivity::ACTION_REVISION_REQUESTED,
-                default => TaskActivity::ACTION_STATUS_CHANGED,
-            }, array_filter([
+            $task->recordActivity($actor, $this->activityAction($task, $toStatus, $decision), array_filter([
                 'status' => ['from' => $fromStatus, 'to' => $toStatus],
                 'note' => $decision !== null ? $note : null,
             ]));
@@ -133,6 +129,26 @@ class TaskWorkflowService
                 && $this->reviewRuleAllows($task, $toStatus))
             ->keys()
             ->all();
+    }
+
+    /**
+     * Name the transition for the activity history: review decisions, (re)submissions, or a plain status change.
+     */
+    protected function activityAction(Task $task, string $toStatus, ?string $decision): string
+    {
+        if ($decision !== null) {
+            return $decision === TaskReview::DECISION_APPROVED
+                ? TaskActivity::ACTION_APPROVED
+                : TaskActivity::ACTION_REVISION_REQUESTED;
+        }
+
+        if ($toStatus !== Task::STATUS_READY_REVIEW) {
+            return TaskActivity::ACTION_STATUS_CHANGED;
+        }
+
+        return $task->reviews()->where('decision', TaskReview::DECISION_REVISION_REQUESTED)->exists()
+            ? TaskActivity::ACTION_RESUBMITTED
+            : TaskActivity::ACTION_SUBMITTED;
     }
 
     /**
