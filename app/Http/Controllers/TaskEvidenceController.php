@@ -8,7 +8,6 @@ use App\Models\Task;
 use App\Models\TaskEvidence;
 use App\Services\TaskEvidenceService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -48,31 +47,5 @@ class TaskEvidenceController extends Controller
         Gate::authorize('view', $task);
 
         return $taskEvidenceService->download($evidence);
-    }
-
-    /**
-     * Show an image or PDF evidence inline, for thumbnails and the preview.
-     */
-    public function preview(Task $task, TaskEvidence $evidence, TaskEvidenceService $taskEvidenceService): StreamedResponse
-    {
-        abort_unless($evidence->task_id === $task->id && $evidence->isPreviewable(), 404);
-
-        Gate::authorize('view', $task);
-
-        return $taskEvidenceService->preview($evidence);
-    }
-
-    /**
-     * Remove an evidence uploaded by the current PIC.
-     */
-    public function destroy(Request $request, Task $task, TaskEvidence $evidence, TaskEvidenceService $taskEvidenceService): JsonResponse
-    {
-        abort_unless($evidence->task_id === $task->id, 404);
-
-        Gate::authorize('deleteEvidence', [$task, $evidence]);
-
-        $taskEvidenceService->delete($request->user(), $task, $evidence);
-
-        return response()->json(['message' => 'Evidence berhasil dihapus.']);
     }
 }

@@ -50,7 +50,6 @@ class TaskEvidenceService
             ];
         } else {
             $attributes['url'] = $data['url'];
-            $attributes['title'] = $data['title'] ?? null;
         }
 
         return DB::transaction(function () use ($submitter, $task, $attributes) {
@@ -65,45 +64,11 @@ class TaskEvidenceService
     }
 
     /**
-     * Remove an evidence the PIC uploaded. It is soft deleted, so the review trail keeps it, and the file stays stored.
-     *
-     * @throws TaskEvidenceLockedException
-     */
-    public function delete(Account $actor, Task $task, TaskEvidence $evidence): void
-    {
-        if (in_array($task->status, self::LOCKED_STATUSES, true)) {
-            throw new TaskEvidenceLockedException;
-        }
-
-        DB::transaction(function () use ($actor, $task, $evidence) {
-            $evidence->update(['deleted_by' => $actor->id]);
-            $evidence->delete();
-
-            $task->recordActivity($actor, TaskActivity::ACTION_EVIDENCE_DELETED, [
-                'evidence' => ['id' => $evidence->id, 'type' => $evidence->type, 'name' => $evidence->displayName()],
-            ]);
-        });
-    }
-
-    /**
      * Stream an evidence file as a download.
      */
     public function download(TaskEvidence $evidence): StreamedResponse
     {
-        return Storage::disk($this->disk())->download($evidence->file_path, $evidence->file_name, [
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
-    }
-
-    /**
-     * Stream an image or PDF evidence inline for the preview. The stored MIME type is sent and sniffing is disabled.
-     */
-    public function preview(TaskEvidence $evidence): StreamedResponse
-    {
-        return Storage::disk($this->disk())->response($evidence->file_path, $evidence->file_name, [
-            'Content-Type' => $evidence->mime_type,
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return Storage::disk($this->disk())->download($evidence->file_path, $evidence->file_name);
     }
 
     protected function disk(): string

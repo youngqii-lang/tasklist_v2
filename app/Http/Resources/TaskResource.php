@@ -54,7 +54,6 @@ class TaskResource extends JsonResource
                 'fullname' => $pic->fullname,
                 'username' => $pic->username,
             ])->all()),
-            'evidences_count' => $this->whenCounted('evidences'),
             'evidences' => TaskEvidenceResource::collection($this->whenLoaded('evidences')),
             'reviews' => TaskReviewResource::collection($this->whenLoaded('reviews')),
             'activities' => TaskActivityResource::collection($this->whenLoaded('activities')),

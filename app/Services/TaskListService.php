@@ -19,7 +19,6 @@ class TaskListService
     {
         return $this->query($account, $filters)
             ->with(['division', 'pics'])
-            ->withCount('evidences')
             ->sortBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc')
             ->paginate($filters['per_page'] ?? 15)
             ->withQueryString();

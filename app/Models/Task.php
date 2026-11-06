@@ -198,7 +198,7 @@ class Task extends Model
      */
     public function evidences(): HasMany
     {
-        return $this->hasMany(TaskEvidence::class)->chaperone();
+        return $this->hasMany(TaskEvidence::class);
     }
 
     /**

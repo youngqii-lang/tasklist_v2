@@ -5,7 +5,6 @@ namespace App\Policies;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
-use App\Models\TaskEvidence;
 
 /**
  * Task permissions follow the role permissions in role_permissions (TASK-12 RBAC matrix).
@@ -110,16 +109,6 @@ class TaskPolicy
     public function addEvidence(Account $user, Task $task): bool
     {
         return $task->hasActivePic($user);
-    }
-
-    /**
-     * A PIC may remove the evidence they uploaded while the task is still theirs.
-     */
-    public function deleteEvidence(Account $user, Task $task, TaskEvidence $evidence): bool
-    {
-        return $evidence->task_id === $task->id
-            && $evidence->submitter_id === $user->id
-            && $task->hasActivePic($user);
     }
 
     /**

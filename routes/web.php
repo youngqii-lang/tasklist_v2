@@ -49,8 +49,6 @@ Route::middleware('auth')->group(function () {
             Route::get('/tasks/{task}/evidences', [TaskEvidenceController::class, 'index'])->name('tasks.evidences.index');
             Route::post('/tasks/{task}/evidences', [TaskEvidenceController::class, 'store'])->name('tasks.evidences.store');
             Route::get('/tasks/{task}/evidences/{evidence}/download', [TaskEvidenceController::class, 'download'])->name('tasks.evidences.download');
-            Route::get('/tasks/{task}/evidences/{evidence}/preview', [TaskEvidenceController::class, 'preview'])->name('tasks.evidences.preview');
-            Route::delete('/tasks/{task}/evidences/{evidence}', [TaskEvidenceController::class, 'destroy'])->name('tasks.evidences.destroy');
         });
     });
 });
