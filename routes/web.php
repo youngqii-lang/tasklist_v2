@@ -11,6 +11,7 @@ use App\Http\Controllers\TaskPicController;
 use App\Http\Controllers\TaskReviewController;
 use App\Http\Controllers\TaskStatusController;
 use App\Http\Controllers\TaskSummaryController;
+use App\Http\Controllers\TimelineController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -27,6 +28,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('api/v1')->name('api.')->group(function () {
         Route::get('/task-options', [TaskOptionController::class, 'index'])->name('task-options.index');
         Route::get('/task-options/pics', [TaskOptionController::class, 'pics'])->name('task-options.pics');
+        Route::get('/timeline', TimelineController::class)->name('timeline');
         Route::get('/tasks/summary', TaskSummaryController::class)->name('tasks.summary');
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update'])->whereNumber('task');
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
