@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskEvidenceController;
 use App\Http\Controllers\TaskOptionController;
 use App\Http\Controllers\TaskPicController;
 use App\Http\Controllers\TaskStatusController;
@@ -26,5 +27,11 @@ Route::middleware('auth')->group(function () {
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update'])->whereNumber('task');
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
         Route::patch('/tasks/{task}/status', [TaskStatusController::class, 'update'])->whereNumber('task')->name('tasks.status.update');
+
+        Route::whereNumber(['task', 'evidence'])->group(function () {
+            Route::get('/tasks/{task}/evidences', [TaskEvidenceController::class, 'index'])->name('tasks.evidences.index');
+            Route::post('/tasks/{task}/evidences', [TaskEvidenceController::class, 'store'])->name('tasks.evidences.store');
+            Route::get('/tasks/{task}/evidences/{evidence}/download', [TaskEvidenceController::class, 'download'])->name('tasks.evidences.download');
+        });
     });
 });
