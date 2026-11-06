@@ -35,6 +35,46 @@ class AccountFactory extends Factory
     }
 
     /**
+     * Indicate that the account has the admin role.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::firstOrCreate(['code_role' => Role::ADMIN], ['name' => 'Admin'])->id,
+        ]);
+    }
+
+    /**
+     * Indicate that the account has the supervisor role.
+     */
+    public function supervisor(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::firstOrCreate(['code_role' => Role::SUPERVISOR], ['name' => 'Supervisor'])->id,
+        ]);
+    }
+
+    /**
+     * Indicate that the account has the freelance role.
+     */
+    public function freelance(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::firstOrCreate(['code_role' => Role::FREELANCE], ['name' => 'Freelance'])->id,
+        ]);
+    }
+
+    /**
+     * Indicate that the account has been deactivated.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
+    }
+
+    /**
      * Indicate that the account has the manager role.
      */
     public function manager(): static

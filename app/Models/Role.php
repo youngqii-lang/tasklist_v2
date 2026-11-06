@@ -26,6 +26,13 @@ class Role extends Model
     public const string FREELANCE = 'freelance';
 
     /**
+     * Roles whose accounts can be assigned as task PIC.
+     *
+     * @var list<string>
+     */
+    public const array STAFF_ROLES = [self::EMPLOYEE, self::FREELANCE];
+
+    /**
      * Get the accounts that have this role.
      *
      * @return HasMany<Account, $this>
