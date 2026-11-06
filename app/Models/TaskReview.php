@@ -14,6 +14,20 @@ class TaskReview extends Model
     /** @use HasFactory<TaskReviewFactory> */
     use HasFactory;
 
+    public const string DECISION_APPROVED = 'approved';
+
+    public const string DECISION_REVISION_REQUESTED = 'revision_requested';
+
+    /**
+     * Display labels for every review decision.
+     *
+     * @var array<string, string>
+     */
+    public const array DECISION_LABELS = [
+        self::DECISION_APPROVED => 'Approve',
+        self::DECISION_REVISION_REQUESTED => 'Request Revision',
+    ];
+
     /**
      * Get the reviewed task.
      *

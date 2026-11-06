@@ -27,6 +27,7 @@ class UpdateTaskStatusRequest extends FormRequest
         return [
             'status' => ['required', 'string', Rule::in(array_keys(Task::STATUS_LABELS))],
             'version' => ['required', 'integer'],
+            'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
 
@@ -41,6 +42,7 @@ class UpdateTaskStatusRequest extends FormRequest
             'required' => ':attribute wajib diisi.',
             'integer' => ':attribute tidak valid.',
             'in' => ':attribute yang dipilih tidak valid.',
+            'max' => ':attribute maksimal :max karakter.',
             'version.required' => 'Versi data tugas wajib dikirim.',
         ];
     }
@@ -55,6 +57,7 @@ class UpdateTaskStatusRequest extends FormRequest
         return [
             'status' => 'Status',
             'version' => 'Versi',
+            'note' => 'Catatan',
         ];
     }
 }

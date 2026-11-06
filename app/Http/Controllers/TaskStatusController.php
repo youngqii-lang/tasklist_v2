@@ -24,6 +24,7 @@ class TaskStatusController extends Controller
             $task,
             $request->validated('status'),
             $request->integer('version'),
+            $request->validated('note'),
         );
 
         return (new TaskResource($taskService->loadDetail($task)))->additional(['message' => 'Status tugas berhasil diperbarui.']);

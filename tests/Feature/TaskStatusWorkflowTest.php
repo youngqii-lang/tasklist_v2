@@ -112,13 +112,23 @@ class TaskStatusWorkflowTest extends TestCase
         $this->assertNotNull($task->fresh()->completed_at);
     }
 
-    public function test_manager_can_send_a_reviewed_task_back_to_process(): void
+    public function test_manager_can_send_a_reviewed_task_back_to_process_with_a_note(): void
     {
         $task = $this->task(Task::STATUS_ON_REVIEW, ['requires_review' => true]);
 
         $this->moveTo($this->manager, $task, Task::STATUS_IN_PROGRESS)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['note' => 'Catatan revisi wajib diisi.']);
+
+        $this->actingAs($this->manager)
+            ->patchJson(route('api.tasks.status.update', $task), [
+                'status' => Task::STATUS_IN_PROGRESS,
+                'version' => $task->fresh()->version,
+                'note' => 'Perbaiki warna logo.',
+            ])
             ->assertOk()
-            ->assertJsonPath('data.status', Task::STATUS_IN_PROGRESS);
+            ->assertJsonPath('data.status', Task::STATUS_IN_PROGRESS)
+            ->assertJsonPath('data.reviews.0.decision', 'revision_requested');
     }
 
     public function test_pic_cannot_do_the_manager_transitions(): void
