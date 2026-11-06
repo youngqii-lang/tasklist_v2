@@ -1,7 +1,7 @@
 @extends('layouts.app', ['title' => 'Login'])
 
 @section('content')
-    <main class="bg-motif flex min-h-screen items-center justify-center px-4 py-10">
+    <main class="bg-[#faf7f7] flex min-h-screen items-center justify-center px-4 py-10">
         <div class="w-full max-w-sm overflow-hidden rounded-2xl bg-burgundy-700 text-burgundy-50 shadow-xl shadow-burgundy-900/20 ring-1 ring-burgundy-800">
             <div class="bg-burgundy-800/60 px-6 pt-8 pb-6 text-center">
                 <h1 class="text-2xl font-semibold">Selamat datang 👋</h1>
