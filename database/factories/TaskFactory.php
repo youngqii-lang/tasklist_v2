@@ -29,8 +29,7 @@ class TaskFactory extends Factory
             'priority' => fake()->randomElement(['low', 'medium', 'high', 'urgent']),
             'status' => 'backlog',
             'start_date' => $startDate,
-            'deadline' => fake()->dateTimeBetween($startDate, '+1 month'),
-        ];
+            'deadline' => fake()->dateTimeBetween($startDate, '+1 month'),        ];
     }
 
     /**

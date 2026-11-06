@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Account;
 use App\Models\Division;
+use App\Models\Task;
 
 class TaskPolicy
 {
@@ -13,6 +14,14 @@ class TaskPolicy
     public function viewAny(Account $user): bool
     {
         return true;
+    }
+
+    /**
+     * Admins see every task, managers the tasks of their division, and everyone else only the tasks they are PIC of.
+     */
+    public function view(Account $user, Task $task): bool
+    {
+        return $this->manages($user, $task) || $task->hasActivePic($user);
     }
 
     /**
@@ -30,5 +39,33 @@ class TaskPolicy
         }
 
         return $division === null || $user->division_id === $division->id;
+    }
+
+    /**
+     * Only admins and the manager of the task's division may edit the main task information.
+     */
+    public function update(Account $user, Task $task): bool
+    {
+        return $this->manages($user, $task);
+    }
+
+    /**
+     * Only admins may move a task to another division.
+     */
+    public function changeDivision(Account $user, Task $task, Division $division): bool
+    {
+        return $task->division_id === $division->id || $user->isAdmin();
+    }
+
+    /**
+     * Admins manage every task; managers only the tasks of their own division.
+     */
+    protected function manages(Account $user, Task $task): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->isManager() && $user->division_id !== null && $user->division_id === $task->division_id;
     }
 }

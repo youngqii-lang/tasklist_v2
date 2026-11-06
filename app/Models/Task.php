@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\StaleTaskVersionException;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -34,6 +35,15 @@ class Task extends Model
     /** @use HasFactory<TaskFactory> */
     use HasFactory, SoftDeletes;
 
+    /**
+     * The model's default values for attributes.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'version' => 1,
+    ];
+
     public const string STATUS_BACKLOG = 'backlog';
 
     public const string STATUS_TODO = 'todo';
@@ -52,6 +62,13 @@ class Task extends Model
      * @var list<string>
      */
     public const array INITIAL_STATUSES = [self::STATUS_BACKLOG, self::STATUS_TODO];
+
+    /**
+     * Statuses in which the work has been handed in for review or is finished.
+     *
+     * @var list<string>
+     */
+    public const array REVIEW_STAGE_STATUSES = [self::STATUS_READY_REVIEW, self::STATUS_ON_REVIEW, self::STATUS_DONE];
 
     /**
      * Display labels for every status, in workflow order.
@@ -210,6 +227,48 @@ class Task extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(TaskActivity::class);
+    }
+
+    /**
+     * Determine whether the account is currently a PIC of the task.
+     */
+    public function hasActivePic(Account $account): bool
+    {
+        if ($this->relationLoaded('pics')) {
+            return $this->pics->contains($account);
+        }
+
+        return $this->assignments()->where('account_id', $account->id)->whereNull('unassigned_at')->exists();
+    }
+
+    /**
+     * Reload the task with a row lock and make sure nobody changed it since the client loaded it.
+     *
+     * @throws StaleTaskVersionException
+     */
+    public function lockForVersion(int $expectedVersion): static
+    {
+        $task = static::query()->lockForUpdate()->findOrFail($this->getKey());
+
+        if ($task->version !== $expectedVersion) {
+            throw new StaleTaskVersionException;
+        }
+
+        return $task;
+    }
+
+    /**
+     * Append an entry to the audit trail of the task.
+     *
+     * @param  array<string, mixed>  $changes
+     */
+    public function recordActivity(?Account $account, string $action, array $changes = []): TaskActivity
+    {
+        return $this->activities()->create([
+            'account_id' => $account?->id,
+            'action' => $action,
+            'changes' => $changes,
+        ]);
     }
 
     /**

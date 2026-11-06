@@ -19,6 +19,17 @@ class TaskActivity extends Model
      */
     public const UPDATED_AT = null;
 
+    public const string ACTION_UPDATED = 'updated';
+
+    /**
+     * Display labels for every recorded action.
+     *
+     * @var array<string, string>
+     */
+    public const array ACTION_LABELS = [
+        self::ACTION_UPDATED => 'Informasi tugas diperbarui',
+    ];
+
     /**
      * Get the task the activity belongs to.
      *

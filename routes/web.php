@@ -21,6 +21,6 @@ Route::middleware('auth')->group(function () {
     Route::prefix('api/v1')->name('api.')->group(function () {
         Route::get('/task-options', [TaskOptionController::class, 'index'])->name('task-options.index');
         Route::get('/task-options/pics', [TaskOptionController::class, 'pics'])->name('task-options.pics');
-        Route::apiResource('tasks', TaskController::class)->only(['index', 'store']);
+        Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update'])->whereNumber('task');
     });
 });

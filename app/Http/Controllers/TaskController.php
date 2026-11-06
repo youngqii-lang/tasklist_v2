@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ListTasksRequest;
 use App\Http\Requests\StoreTaskRequest;
+use App\Http\Requests\UpdateTaskRequest;
 use App\Http\Resources\TaskResource;
 use App\Models\Division;
 use App\Models\Task;
@@ -39,5 +40,25 @@ class TaskController extends Controller
             ->additional(['message' => 'Tugas berhasil dibuat.'])
             ->response()
             ->setStatusCode(201);
+    }
+
+    /**
+     * Show the full detail of a task.
+     */
+    public function show(Task $task, TaskService $taskService): TaskResource
+    {
+        Gate::authorize('view', $task);
+
+        return new TaskResource($taskService->loadDetail($task));
+    }
+
+    /**
+     * Update the main information of a task.
+     */
+    public function update(UpdateTaskRequest $request, Task $task, TaskService $taskService): TaskResource
+    {
+        $task = $taskService->update($request->user(), $task, $request->validated());
+
+        return (new TaskResource($task))->additional(['message' => 'Tugas berhasil diperbarui.']);
     }
 }
