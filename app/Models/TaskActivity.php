@@ -31,6 +31,8 @@ class TaskActivity extends Model
 
     public const string ACTION_EVIDENCE_ADDED = 'evidence_added';
 
+    public const string ACTION_EVIDENCE_DELETED = 'evidence_deleted';
+
     public const string ACTION_SUBMITTED = 'submitted';
 
     public const string ACTION_RESUBMITTED = 'resubmitted';
@@ -51,6 +53,7 @@ class TaskActivity extends Model
         self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
         self::ACTION_STATUS_CHANGED => 'Status tugas diubah',
         self::ACTION_EVIDENCE_ADDED => 'Evidence ditambahkan',
+        self::ACTION_EVIDENCE_DELETED => 'Evidence dihapus',
         self::ACTION_SUBMITTED => 'Hasil kerja dikirim untuk diperiksa',
         self::ACTION_RESUBMITTED => 'Hasil revisi dikirim ulang',
         self::ACTION_APPROVED => 'Tugas disetujui',
