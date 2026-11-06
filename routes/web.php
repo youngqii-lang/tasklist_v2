@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\TaskActivityController;
 use App\Http\Controllers\TaskController;
@@ -29,6 +30,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/task-options', [TaskOptionController::class, 'index'])->name('task-options.index');
         Route::get('/task-options/pics', [TaskOptionController::class, 'pics'])->name('task-options.pics');
         Route::get('/timeline', TimelineController::class)->name('timeline');
+        Route::get('/calendar', [CalendarController::class, 'month'])->name('calendar.month');
+        Route::get('/calendar/deadlines', [CalendarController::class, 'deadlines'])->name('calendar.deadlines');
         Route::get('/tasks/summary', TaskSummaryController::class)->name('tasks.summary');
         Route::apiResource('tasks', TaskController::class)->only(['index', 'store', 'show', 'update'])->whereNumber('task');
         Route::put('/tasks/{task}/pics', [TaskPicController::class, 'update'])->whereNumber('task')->name('tasks.pics.update');
