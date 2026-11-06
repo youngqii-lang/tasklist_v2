@@ -1,13 +1,7 @@
 @php
     $account = auth()->user()->loadMissing(['role', 'division']);
     $appName = config('app.name');
-    $appNameWords = preg_split('/\s+/', trim($appName));
-    preg_match_all('/\p{Lu}/u', $appName, $appNameCapitals);
-    $appInitials = match (true) {
-        count($appNameWords) > 1 => mb_substr($appNameWords[0], 0, 1).mb_substr($appNameWords[1], 0, 1),
-        count($appNameCapitals[0]) > 1 => $appNameCapitals[0][0].$appNameCapitals[0][1],
-        default => mb_substr($appName, 0, 2),
-    };
+    $appInitial = mb_strtoupper(mb_substr($appName, 0, 1));
 @endphp
 
 <aside
@@ -16,7 +10,7 @@
 >
     <div class="flex items-center gap-3 px-6 pt-7 pb-6">
         <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#0c5963] text-lg font-bold text-white uppercase shadow-lg shadow-black/25 ring-1 ring-white/15">
-            {{ $appInitials }}
+            {{ $appInitial }}
         </div>
         <div class="min-w-0">
             <p class="truncate text-lg leading-tight font-bold text-white">{{ $appName }}</p>
@@ -67,7 +61,7 @@
         <div class="rounded-xl bg-burgundy-800/50 p-4 ring-1 ring-burgundy-700">
             <div class="flex items-center justify-between gap-2">
                 <p class="text-xs text-burgundy-300">Akun Aktif</p>
-                <span class="rounded-md bg-burgundy-700 px-2 py-0.5 text-xs font-medium text-burgundy-50 ring-1 ring-burgundy-600">
+                <span class="rounded-md bg-[#0c5963] px-2 py-0.5 text-xs font-medium text-white ring-1 ring-white/15">
                     {{ $account->role->name }}
                 </span>
             </div>
