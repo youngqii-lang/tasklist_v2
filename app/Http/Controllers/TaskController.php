@@ -6,6 +6,7 @@ use App\Http\Requests\DestroyTaskRequest;
 use App\Http\Requests\ListTasksRequest;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
+use App\Http\Resources\TaskPreviewResource;
 use App\Http\Resources\TaskResource;
 use App\Models\Division;
 use App\Models\Task;
@@ -51,6 +52,16 @@ class TaskController extends Controller
         Gate::authorize('view', $task);
 
         return new TaskResource($taskService->loadDetail($task));
+    }
+
+    /**
+     * Show the short summary of a task for the calendar pop-up, using its latest data.
+     */
+    public function preview(Task $task): TaskPreviewResource
+    {
+        Gate::authorize('view', $task);
+
+        return new TaskPreviewResource($task->load('pics'));
     }
 
     /**
