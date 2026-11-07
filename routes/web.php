@@ -8,6 +8,7 @@ use App\Http\Controllers\TaskActivityController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskEvidenceController;
+use App\Http\Controllers\TasklistController;
 use App\Http\Controllers\TaskOptionController;
 use App\Http\Controllers\TaskPicController;
 use App\Http\Controllers\TaskReviewController;
@@ -23,6 +24,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::view('/', 'dashboard')->name('dashboard');
+    Route::get('/tasks', TasklistController::class)->name('tasks.index');
     Route::resource('accounts', AccountController::class)->except('show');
     Route::resource('divisions', DivisionController::class)->except('show');
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
