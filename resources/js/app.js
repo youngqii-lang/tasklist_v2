@@ -1,3 +1,11 @@
+import Alpine from 'alpinejs';
+import tasklist from './tasklist/tasklist';
+import taskForm from './tasklist/task-form';
+import taskDetail from './tasklist/task-detail';
+import taskTimeline from './tasklist/timeline';
+import taskCalendar from './tasklist/calendar';
+import toast from './tasklist/toast';
+
 /**
  * Open and close the sidebar on small screens.
  */
@@ -89,3 +97,17 @@ document.querySelectorAll('[data-password-toggle]').forEach((button) => {
         input.focus();
     });
 });
+
+/**
+ * Alpine.js components of the Tasklist page.
+ */
+
+Alpine.store('toast', toast);
+Alpine.data('tasklist', tasklist);
+Alpine.data('taskForm', taskForm);
+Alpine.data('taskDetail', taskDetail);
+Alpine.data('taskTimeline', taskTimeline);
+Alpine.data('taskCalendar', taskCalendar);
+
+window.Alpine = Alpine;
+Alpine.start();

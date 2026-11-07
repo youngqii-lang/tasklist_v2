@@ -18,3 +18,7 @@
     --color-burgundy-800: #560016;
     --color-burgundy-900: #400010;
 }
+
+[x-cloak] {
+    display: none !important;
+}

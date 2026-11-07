@@ -63,6 +63,7 @@ class TaskResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'abilities' => [
+                'manage' => (bool) $request->user()?->can('manage', $this->resource),
                 'update' => (bool) $request->user()?->can('update', $this->resource),
                 'delete' => (bool) $request->user()?->can('delete', $this->resource),
                 'assign' => (bool) $request->user()?->can('assign', $this->resource),
