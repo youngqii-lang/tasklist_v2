@@ -76,6 +76,5 @@
         @include('tasks.partials.revision-dialog')
         @include('tasks.partials.task-form')
         @include('tasks.partials.task-detail')
-        @include('tasks.partials.toasts')
     </div>
 @endsection

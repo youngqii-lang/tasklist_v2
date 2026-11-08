@@ -226,6 +226,7 @@ export default (config) => ({
         } catch (error) {
             this.errors = error.errors;
             this.generalError = Object.keys(this.errors).length ? 'Periksa kembali isian yang ditandai.' : error.message;
+            Alpine.store('toast').failure(error);
             this.saving = false;
         }
     },

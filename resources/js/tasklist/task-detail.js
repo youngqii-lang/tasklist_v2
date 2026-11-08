@@ -154,7 +154,7 @@ export default (config) => ({
 
     /** Show the failure; a stale version means somebody else changed the task, so show its latest data. */
     onFailure(error) {
-        Alpine.store('toast').error(error.message);
+        Alpine.store('toast').failure(error);
 
         if (error.status === 409) {
             this.load({ silent: true });
@@ -280,7 +280,7 @@ export default (config) => ({
         } catch (error) {
             const errors = error.errors;
             this.assignment.error = errors.pic_ids?.[0] ?? Object.values(errors)[0]?.[0] ?? error.message;
-            if (error.status === 409) this.onFailure(error);
+            this.onFailure(error);
         } finally {
             this.assignment.saving = false;
         }
@@ -327,7 +327,7 @@ export default (config) => ({
             await this.afterChange(response);
         } catch (error) {
             this.evidence.errors = error.errors;
-            if (!Object.keys(error.errors).length) Alpine.store('toast').error(error.message);
+            this.onFailure(error);
         } finally {
             this.evidence.saving = false;
         }
@@ -361,6 +361,7 @@ export default (config) => ({
 
         if (decision === 'revision_requested' && !this.review.note.trim()) {
             this.review.error = 'Catatan revisi wajib diisi.';
+            Alpine.store('toast').error(this.review.error);
 
             return;
         }
@@ -377,7 +378,7 @@ export default (config) => ({
             await this.afterChange(response);
         } catch (error) {
             this.review.error = error.errors.note?.[0] ?? null;
-            if (!this.review.error) this.onFailure(error);
+            this.onFailure(error);
         } finally {
             this.review.saving = false;
         }
@@ -447,6 +448,7 @@ export default (config) => ({
 
         if (!this.comments.content.trim()) {
             this.comments.errors = { content: ['Komentar tidak boleh kosong.'] };
+            Alpine.store('toast').error('Komentar tidak boleh kosong.');
 
             return;
         }
@@ -465,7 +467,7 @@ export default (config) => ({
             await this.loadComments();
         } catch (error) {
             this.comments.errors = error.errors;
-            if (!Object.keys(error.errors).length) Alpine.store('toast').error(error.message);
+            Alpine.store('toast').failure(error);
         } finally {
             this.comments.saving = false;
         }

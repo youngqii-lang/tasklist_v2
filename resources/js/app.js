@@ -4,7 +4,7 @@ import taskForm from './tasklist/task-form';
 import taskDetail from './tasklist/task-detail';
 import taskTimeline from './tasklist/timeline';
 import taskCalendar from './tasklist/calendar';
-import toast from './tasklist/toast';
+import toast from './toast';
 
 /**
  * Open and close the sidebar on small screens.

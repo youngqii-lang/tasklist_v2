@@ -425,7 +425,7 @@ export default (config) => ({
             return true;
         } catch (error) {
             this.setCardStatus(task, previousStatus);
-            Alpine.store('toast').error(error.errors?.note?.[0] ?? error.message);
+            Alpine.store('toast').failure(error);
 
             if (error.status === 409) this.refresh();
 
@@ -447,6 +447,7 @@ export default (config) => ({
 
         if (!this.revision.note.trim()) {
             this.revision.error = 'Catatan revisi wajib diisi.';
+            Alpine.store('toast').error(this.revision.error);
 
             return;
         }
