@@ -9,18 +9,25 @@ use Illuminate\Database\Seeder;
 class AccountSeeder extends Seeder
 {
     /**
-     * Seed the default manager account, since the application has no registration.
+     * Seed the default accounts, since the application has no registration.
      */
     public function run(): void
     {
-        Account::updateOrCreate(
-            ['username' => 'manager'],
-            [
-                'role_id' => Role::where('code_role', Role::MANAGER)->value('id'),
-                'division_id' => null,
-                'fullname' => 'Default Manager',
-                'password' => 'password',
-            ],
-        );
+        $accounts = [
+            ['username' => 'manager', 'fullname' => 'Default Manager', 'role' => Role::MANAGER],
+            ['username' => 'admin', 'fullname' => 'Admin', 'role' => Role::ADMIN],
+        ];
+
+        foreach ($accounts as $account) {
+            Account::updateOrCreate(
+                ['username' => $account['username']],
+                [
+                    'role_id' => Role::where('code_role', $account['role'])->valueOrFail('id'),
+                    'division_id' => null,
+                    'fullname' => $account['fullname'],
+                    'password' => 'password',
+                ],
+            );
+        }
     }
 }

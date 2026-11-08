@@ -136,6 +136,107 @@ class AccountManagementTest extends TestCase
         $response->assertDontSee('name="role_id"', false);
     }
 
+    public function test_admin_create_form_has_role_field_with_every_role(): void
+    {
+        $admin = Account::factory()->admin()->create();
+
+        $response = $this->actingAs($admin)->get(route('accounts.create'))->assertOk();
+
+        $response->assertSee('name="role_id"', false)->assertSee('Pilih role');
+
+        foreach (Role::pluck('name') as $roleName) {
+            $response->assertSee($roleName);
+        }
+    }
+
+    #[DataProvider('roleCodes')]
+    public function test_admin_can_create_account_with_chosen_role(string $roleCode): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $division = Division::factory()->create();
+
+        $this->actingAs($admin)->post(route('accounts.store'), [
+            'fullname' => 'Akun Baru',
+            'username' => 'akunbaru',
+            'password' => 'rahasia123',
+            'role_id' => Role::where('code_role', $roleCode)->value('id'),
+            'division_id' => $division->id,
+        ])->assertRedirect(route('accounts.index'))->assertSessionHas('status', 'Akun Akun Baru berhasil dibuat.');
+
+        $this->assertSame($roleCode, Account::where('username', 'akunbaru')->firstOrFail()->role->code_role);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function roleCodes(): array
+    {
+        return [
+            'admin' => [Role::ADMIN],
+            'manager' => [Role::MANAGER],
+            'supervisor' => [Role::SUPERVISOR],
+            'employee' => [Role::EMPLOYEE],
+            'freelance' => [Role::FREELANCE],
+        ];
+    }
+
+    public function test_admin_must_choose_a_valid_role(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $payload = [
+            'fullname' => 'Akun Baru',
+            'username' => 'akunbaru',
+            'password' => 'rahasia123',
+            'division_id' => Division::factory()->create()->id,
+        ];
+
+        $this->actingAs($admin)->post(route('accounts.store'), $payload)->assertSessionHasErrors('role_id');
+        $this->actingAs($admin)->post(route('accounts.store'), [...$payload, 'role_id' => 999])->assertSessionHasErrors('role_id');
+
+        $this->assertDatabaseMissing('accounts', ['username' => 'akunbaru']);
+    }
+
+    public function test_manager_cannot_choose_role_when_creating_account(): void
+    {
+        $manager = Account::factory()->manager()->create();
+
+        $this->actingAs($manager)->post(route('accounts.store'), [
+            'fullname' => 'Akun Baru',
+            'username' => 'akunbaru',
+            'password' => 'rahasia123',
+            'role_id' => Role::where('code_role', Role::ADMIN)->value('id'),
+            'division_id' => Division::factory()->create()->id,
+        ])->assertRedirect(route('accounts.index'));
+
+        $this->assertSame(Role::EMPLOYEE, Account::where('username', 'akunbaru')->firstOrFail()->role->code_role);
+    }
+
+    public function test_admin_can_update_and_delete_other_accounts_but_not_delete_itself(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $other = Account::factory()->employee()->create();
+
+        $this->actingAs($admin)->get(route('accounts.index'))
+            ->assertSee(route('accounts.create'))
+            ->assertSee(route('accounts.edit', $other));
+
+        $this->actingAs($admin)->put(route('accounts.update', $other), [
+            'fullname' => 'Sudah Diubah',
+            'username' => $other->username,
+            'role_id' => Role::where('code_role', Role::SUPERVISOR)->value('id'),
+            'division_id' => Division::factory()->create()->id,
+        ])->assertRedirect(route('accounts.index'));
+
+        $this->assertSame(Role::SUPERVISOR, $other->fresh()->role->code_role);
+        $this->assertSame('Sudah Diubah', $other->fresh()->fullname);
+
+        $this->actingAs($admin)->delete(route('accounts.destroy', $admin))->assertForbidden();
+        $this->actingAs($admin)->delete(route('accounts.destroy', $other))->assertRedirect(route('accounts.index'));
+
+        $this->assertModelMissing($other);
+        $this->assertModelExists($admin);
+    }
+
     public function test_manager_can_create_active_employee_account_with_hashed_password(): void
     {
         $manager = Account::factory()->manager()->create();
