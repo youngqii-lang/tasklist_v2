@@ -41,25 +41,28 @@ class AccountController extends Controller
     }
 
     /**
-     * Show the form for creating a new account.
+     * Show the form for creating a new account. Only admins get to choose the role.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         Gate::authorize('create', Account::class);
 
         return view('accounts.create', [
+            'roles' => $request->user()->can('assignRoleOnCreate', Account::class)
+                ? Role::orderBy('name')->get(['id', 'name'])
+                : null,
             'divisions' => Division::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
     /**
-     * Store a newly created account. New accounts start with the employee role.
+     * Store a newly created account. Without a chosen role (managers) it starts as an employee.
      */
     public function store(StoreAccountRequest $request): RedirectResponse
     {
         $account = Account::create([
             ...$request->safe()->only(['fullname', 'username', 'password', 'division_id']),
-            'role_id' => Role::where('code_role', Role::EMPLOYEE)->valueOrFail('id'),
+            'role_id' => $request->validated('role_id') ?? Role::where('code_role', Role::EMPLOYEE)->valueOrFail('id'),
         ]);
 
         return redirect()

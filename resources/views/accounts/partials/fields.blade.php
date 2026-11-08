@@ -75,6 +75,7 @@
             required
             @class([$fieldClass, $errors->has('role_id') ? $invalidClass : $validClass])
         >
+            <option value="" disabled @selected(! old('role_id', $account?->role_id))>Pilih role</option>
             @foreach ($roles as $role)
                 <option value="{{ $role->id }}" @selected((string) old('role_id', $account?->role_id) === (string) $role->id)>
                     {{ $role->name }}

@@ -28,6 +28,9 @@ class StoreAccountRequest extends FormRequest
             'fullname' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'alpha_num:ascii', 'max:255', Rule::unique('accounts', 'username')],
             'password' => ['required', 'string', 'min:8', 'max:255'],
+            'role_id' => $this->user()->can('assignRoleOnCreate', Account::class)
+                ? ['required', 'integer', Rule::exists('roles', 'id')]
+                : ['exclude'],
             'division_id' => ['required', 'integer', Rule::exists('divisions', 'id')],
         ];
     }
