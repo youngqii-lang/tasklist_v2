@@ -18,6 +18,7 @@ class LoginTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Selamat datang');
+        $response->assertSee('src="'.asset('images/logo.png').'"', false);
     }
 
     public function test_login_page_has_password_visibility_toggle(): void
@@ -95,6 +96,7 @@ class LoginTest extends TestCase
             ->assertSee('href="'.route('dashboard').'"', false)
             ->assertSee('aria-current="page"', false)
             ->assertSee('action="'.route('logout').'"', false)
+            ->assertSee('src="'.asset('images/logo.png').'"', false)
             ->assertSee('Akun Aktif')
             ->assertSee('@budi');
     }

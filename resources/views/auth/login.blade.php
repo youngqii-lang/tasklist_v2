@@ -4,6 +4,13 @@
     <main class="bg-[#faf7f7] flex min-h-screen items-center justify-center px-4 py-10">
         <div class="w-full max-w-sm overflow-hidden rounded-2xl bg-burgundy-700 text-burgundy-50 shadow-xl shadow-burgundy-900/20 ring-1 ring-burgundy-800">
             <div class="bg-burgundy-800/60 px-6 pt-8 pb-6 text-center">
+                <img
+                    src="{{ asset('images/logo.png') }}"
+                    alt="Logo {{ config('app.name') }}"
+                    width="80"
+                    height="80"
+                    class="mx-auto mb-4 size-20 rounded-2xl bg-[#f7f7f7] object-contain p-1 shadow-lg shadow-black/25 ring-1 ring-white/15"
+                >
                 <h1 class="text-2xl font-semibold">Selamat datang 👋</h1>
                 <p class="mt-2 text-sm text-burgundy-100">Silakan masuk untuk mengelola daftar tugasmu hari ini.</p>
             </div>
