@@ -13,12 +13,12 @@
 
     <div
         x-show="!board.error && (board.loading || board.total > 0)"
-        class="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-4 lg:mx-0 lg:px-0"
+        class="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-3"
         :aria-busy="board.loading"
     >
         <template x-for="status in config.statuses" :key="status.value">
             <div
-                class="flex w-72 shrink-0 snap-start flex-col rounded-2xl bg-burgundy-50/60 ring-1 ring-burgundy-100 transition"
+                class="flex min-w-0 flex-col rounded-2xl bg-burgundy-50/60 ring-1 ring-burgundy-100 transition"
                 :class="{
                     'ring-2 ring-emerald-400 bg-emerald-50/60': drag.over === status.value && isDropAllowed(status.value),
                     'ring-2 ring-red-300 bg-red-50/60': drag.over === status.value && !isDropAllowed(status.value),
