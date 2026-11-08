@@ -1,7 +1,6 @@
 @php
     $account = auth()->user()->loadMissing(['role', 'division']);
     $appName = config('app.name');
-    $appInitial = mb_strtoupper(mb_substr($appName, 0, 1));
 @endphp
 
 <aside
@@ -9,9 +8,13 @@
     class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col bg-burgundy-900 text-burgundy-50 shadow-2xl shadow-black/30 transition-transform duration-200 lg:translate-x-0 lg:shadow-none"
 >
     <div class="flex items-center gap-3 px-6 pt-7 pb-6">
-        <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#0c5963] text-lg font-bold text-white uppercase shadow-lg shadow-black/25 ring-1 ring-white/15">
-            {{ $appInitial }}
-        </div>
+        <img
+            src="{{ asset('images/logo.png') }}"
+            alt="Logo {{ $appName }}"
+            width="48"
+            height="48"
+            class="size-12 shrink-0 rounded-xl bg-[#f7f7f7] object-contain p-0.5 shadow-lg shadow-black/25 ring-1 ring-white/15"
+        >
         <div class="min-w-0">
             <p class="truncate text-lg leading-tight font-bold text-white">{{ $appName }}</p>
             <p class="mt-0.5 text-[11px] font-medium tracking-wider text-burgundy-300 uppercase">Task Management</p>
