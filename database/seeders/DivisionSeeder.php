@@ -8,19 +8,24 @@ use Illuminate\Database\Seeder;
 class DivisionSeeder extends Seeder
 {
     /**
+     * The application's divisions, keyed by division code.
+     *
+     * @var array<string, string>
+     */
+    public const array DIVISIONS = [
+        'SEO' => 'SEO',
+        'MKT' => 'Marketing',
+        'SLS' => 'Sales',
+        'CRT' => 'Creative',
+    ];
+
+    /**
      * Seed the application's divisions.
      */
     public function run(): void
     {
-        $divisions = [
-            ['code_division' => 'IT', 'name' => 'Teknologi Informasi'],
-            ['code_division' => 'HRD', 'name' => 'Sumber Daya Manusia'],
-            ['code_division' => 'FIN', 'name' => 'Keuangan'],
-            ['code_division' => 'MKT', 'name' => 'Pemasaran'],
-        ];
-
-        foreach ($divisions as $division) {
-            Division::updateOrCreate(['code_division' => $division['code_division']], $division);
+        foreach (self::DIVISIONS as $code => $name) {
+            Division::updateOrCreate(['code_division' => $code], ['name' => $name]);
         }
     }
 }

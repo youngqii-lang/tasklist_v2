@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed the master data, plus demo accounts and tasks when running locally.
      */
     public function run(): void
     {
@@ -18,7 +18,13 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             PermissionSeeder::class,
             DivisionSeeder::class,
+            PlatformSeeder::class,
+            TaskCategorySeeder::class,
             AccountSeeder::class,
         ]);
+
+        if (app()->environment('local')) {
+            $this->call(DemoSeeder::class);
+        }
     }
 }
