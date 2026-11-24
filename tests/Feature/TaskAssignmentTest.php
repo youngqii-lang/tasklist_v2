@@ -120,23 +120,34 @@ class TaskAssignmentTest extends TestCase
             ->assertJsonPath('data.pics.0.id', $otherDivisionStaff->id);
     }
 
-    public function test_manager_cannot_assign_staff_outside_their_division(): void
+    public function test_supervisor_cannot_assign_staff_outside_their_division(): void
     {
-        $manager = Account::factory()->manager()->for($this->division)->create();
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
         $otherDivisionStaff = Account::factory()->employee()->create();
 
-        $this->putPics($manager, [$otherDivisionStaff->id])
+        $this->putPics($supervisor, [$otherDivisionStaff->id])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['pic_ids.0' => 'PIC harus akun Staff aktif yang berada dalam kewenangan Anda.']);
+            ->assertJsonValidationErrors(['pic_ids.0' => 'PIC harus akun aktif yang berada dalam kewenangan Anda.']);
 
         $this->assertTrue($this->task->hasActivePic($this->currentPic));
     }
 
-    public function test_manager_cannot_reassign_tasks_of_another_division(): void
+    public function test_supervisor_cannot_reassign_tasks_of_another_division(): void
+    {
+        $supervisor = Account::factory()->supervisor()->create();
+
+        $this->putPics($supervisor, [$this->currentPic->id])->assertForbidden();
+    }
+
+    public function test_manager_can_forward_tasks_of_any_division(): void
     {
         $manager = Account::factory()->manager()->create();
+        $otherDivisionStaff = Account::factory()->employee()->create();
 
-        $this->putPics($manager, [$this->currentPic->id])->assertForbidden();
+        $this->putPics($manager, [$otherDivisionStaff->id])->assertOk();
+
+        $this->assertTrue($this->task->hasActivePic($otherDivisionStaff));
+        $this->assertFalse($this->task->hasActivePic($this->currentPic));
     }
 
     public function test_staff_cannot_assign_or_forward_tasks(): void
@@ -148,12 +159,12 @@ class TaskAssignmentTest extends TestCase
         $this->assertTrue($this->task->hasActivePic($this->currentPic));
     }
 
-    public function test_only_active_staff_can_be_assigned(): void
+    public function test_only_active_non_admin_accounts_can_be_assigned(): void
     {
         $admin = Account::factory()->admin()->create();
         $invalidPics = [
             Account::factory()->employee()->for($this->division)->inactive()->create(),
-            Account::factory()->manager()->for($this->division)->create(),
+            Account::factory()->admin()->for($this->division)->create(),
         ];
 
         foreach ($invalidPics as $pic) {

@@ -22,7 +22,11 @@ class TasklistController extends Controller
 
         return view('tasks.index', [
             'config' => [
-                'user' => ['id' => $user->id, 'is_admin' => $user->isAdmin()],
+                'user' => [
+                    'id' => $user->id,
+                    'is_admin' => $user->isAdmin(),
+                    'manages_all_divisions' => $user->managesAllDivisions(),
+                ],
                 'can_create' => $user->can('create', Task::class),
                 'divisions' => Division::query()->orderBy('name')->get(['id', 'name']),
                 'pics' => Account::query()->assignableAsPic()->with('division')->orderBy('fullname')->get()

@@ -20,7 +20,12 @@ class CalendarController extends Controller
             ? CarbonImmutable::createFromFormat('Y-m-d', $request->validated('month').'-01')
             : CarbonImmutable::today();
 
-        return response()->json(['data' => $calendarService->month($request->user(), $month, $this->divisionId($request->validated()))]);
+        return response()->json(['data' => $calendarService->month(
+            $request->user(),
+            $month,
+            $this->divisionId($request->validated()),
+            $request->validated('scope'),
+        )]);
     }
 
     /**
@@ -30,7 +35,7 @@ class CalendarController extends Controller
     {
         $date = CarbonImmutable::createFromFormat('Y-m-d', $request->validated('date'))->startOfDay();
         $divisionId = $this->divisionId($request->validated());
-        $tasks = $calendarService->deadlinesOn($request->user(), $date, $divisionId);
+        $tasks = $calendarService->deadlinesOn($request->user(), $date, $divisionId, $request->validated('scope'));
 
         return response()->json([
             'data' => [

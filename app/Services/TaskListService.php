@@ -51,6 +51,9 @@ class TaskListService
      */
     protected function query(Account $account, array $filters): Builder
     {
-        return Task::query()->visibleTo($account)->filter($filters);
+        return Task::query()
+            ->visibleTo($account)
+            ->inTaskScope($account, $filters['scope'] ?? null)
+            ->filter($filters);
     }
 }

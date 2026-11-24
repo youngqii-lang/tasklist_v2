@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 
@@ -12,20 +13,22 @@ class TaskSummaryService
      *
      * Overdue, due today and urgent only count unfinished tasks; tasks without a deadline never count as overdue or due today.
      *
-     * @param  array{search?: string|null, division_id?: int|null, priority?: string|null, status?: string|null}  $filters
+     * @param  array{scope?: string|null, search?: string|null, division_id?: int|null, priority?: string|null, status?: string|null}  $filters
      * @return array{
      *     scope: array{type: string, label: string},
      *     metrics: array<string, int>,
      *     completion_rate: float,
      * }
      */
-    public function summarize(array $filters): array
+    public function summarize(Account $viewer, array $filters): array
     {
         $today = today()->toDateString();
         $tomorrow = today()->addDay()->toDateString();
         $unfinished = 'status <> ?';
 
         $row = Task::query()
+            ->visibleTo($viewer)
+            ->inTaskScope($viewer, $filters['scope'] ?? null)
             ->filter($filters)
             ->toBase()
             ->selectRaw('count(*) as total')

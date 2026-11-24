@@ -20,12 +20,12 @@ class CalendarService
      *     deadlines: list<array{date: string, total: int, overdue: int}>,
      * }
      */
-    public function month(Account $viewer, CarbonImmutable $month, ?int $divisionId): array
+    public function month(Account $viewer, CarbonImmutable $month, ?int $divisionId, ?string $scope = null): array
     {
         $from = $month->startOfMonth();
         $to = $month->endOfMonth();
 
-        $deadlines = $this->visibleTasks($viewer, $divisionId)
+        $deadlines = $this->visibleTasks($viewer, $divisionId, $scope)
             ->whereDate('deadline', '>=', $from)
             ->whereDate('deadline', '<=', $to)
             ->toBase()
@@ -67,9 +67,9 @@ class CalendarService
      *
      * @return Collection<int, Task>
      */
-    public function deadlinesOn(Account $viewer, CarbonImmutable $date, ?int $divisionId): Collection
+    public function deadlinesOn(Account $viewer, CarbonImmutable $date, ?int $divisionId, ?string $scope = null): Collection
     {
-        return $this->visibleTasks($viewer, $divisionId)
+        return $this->visibleTasks($viewer, $divisionId, $scope)
             ->whereDate('deadline', $date)
             ->with(['division', 'pics'])
             ->sortBy('priority', 'desc')
@@ -77,14 +77,15 @@ class CalendarService
     }
 
     /**
-     * Deadlines follow the task access rules; the division filter can only narrow them.
+     * Deadlines follow the task access rules; the task scope and division filter can only narrow them.
      *
      * @return Builder<Task>
      */
-    protected function visibleTasks(Account $viewer, ?int $divisionId): Builder
+    protected function visibleTasks(Account $viewer, ?int $divisionId, ?string $scope): Builder
     {
         return Task::query()
             ->visibleTo($viewer)
+            ->inTaskScope($viewer, $scope)
             ->when($divisionId, fn (Builder $query) => $query->where('division_id', $divisionId));
     }
 

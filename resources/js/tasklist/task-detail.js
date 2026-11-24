@@ -242,7 +242,7 @@ export default (config) => ({
     },
 
     async loadPicOptions() {
-        const allDivisions = this.config.user.is_admin && this.assignment.allDivisions;
+        const allDivisions = this.config.user.manages_all_divisions && this.assignment.allDivisions;
 
         this.assignment.loading = true;
         this.assignment.error = null;

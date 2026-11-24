@@ -67,7 +67,7 @@ class TaskOptionService
     protected function divisionsFor(Account $user): Collection
     {
         return Division::query()
-            ->when(! $user->isAdmin(), fn (Builder $query) => $query->whereKey($user->division_id))
+            ->when(! $user->managesAllDivisions(), fn (Builder $query) => $query->whereKey($user->division_id))
             ->orderBy('name')
             ->get();
     }

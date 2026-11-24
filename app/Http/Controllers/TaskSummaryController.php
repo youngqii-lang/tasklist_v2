@@ -13,6 +13,6 @@ class TaskSummaryController extends Controller
      */
     public function __invoke(ListTasksRequest $request, TaskSummaryService $taskSummaryService): JsonResponse
     {
-        return response()->json(['data' => $taskSummaryService->summarize($request->validated())]);
+        return response()->json(['data' => $taskSummaryService->summarize($request->user(), $request->validated())]);
     }
 }

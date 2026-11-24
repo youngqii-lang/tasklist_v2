@@ -44,7 +44,19 @@ class TaskOptionTest extends TestCase
             ]);
     }
 
-    public function test_manager_only_receives_their_own_division(): void
+    public function test_supervisor_only_receives_their_own_division(): void
+    {
+        $supervisor = Account::factory()->supervisor()->create();
+        Division::factory()->create();
+
+        $this->actingAs($supervisor)
+            ->getJson(route('api.task-options.index'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data.divisions')
+            ->assertJsonPath('data.divisions.0.id', $supervisor->division_id);
+    }
+
+    public function test_manager_receives_every_division(): void
     {
         $manager = Account::factory()->manager()->create();
         Division::factory()->create();
@@ -52,8 +64,7 @@ class TaskOptionTest extends TestCase
         $this->actingAs($manager)
             ->getJson(route('api.task-options.index'))
             ->assertOk()
-            ->assertJsonCount(1, 'data.divisions')
-            ->assertJsonPath('data.divisions.0.id', $manager->division_id);
+            ->assertJsonCount(Division::count(), 'data.divisions');
     }
 
     public function test_staff_cannot_load_the_task_form_options(): void
@@ -66,45 +77,56 @@ class TaskOptionTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pic_options_only_list_active_staff_of_the_division(): void
+    public function test_pic_options_list_active_non_admin_accounts_of_the_division(): void
     {
-        $manager = Account::factory()->manager()->create();
-        $division = $manager->division;
+        $supervisor = Account::factory()->supervisor()->create();
+        $division = $supervisor->division;
         $employee = Account::factory()->employee()->for($division)->create();
         $freelance = Account::factory()->freelance()->for($division)->create();
+        $manager = Account::factory()->manager()->for($division)->create();
         Account::factory()->employee()->for($division)->inactive()->create();
-        Account::factory()->supervisor()->for($division)->create();
+        Account::factory()->admin()->for($division)->create();
         Account::factory()->employee()->create();
 
-        $response = $this->actingAs($manager)
+        $response = $this->actingAs($supervisor)
             ->getJson(route('api.task-options.pics', ['division_id' => $division->id]))
             ->assertOk()
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(4, 'data');
 
         $this->assertEqualsCanonicalizing(
-            [$employee->id, $freelance->id],
+            [$employee->id, $freelance->id, $manager->id, $supervisor->id],
             collect($response->json('data'))->pluck('id')->all(),
         );
     }
 
-    public function test_manager_cannot_list_pics_of_another_division(): void
+    public function test_supervisor_cannot_list_pics_of_another_division(): void
     {
-        $manager = Account::factory()->manager()->create();
+        $supervisor = Account::factory()->supervisor()->create();
         $otherDivision = Division::factory()->create();
 
-        $this->actingAs($manager)
+        $this->actingAs($supervisor)
             ->getJson(route('api.task-options.pics', ['division_id' => $otherDivision->id]))
             ->assertForbidden();
     }
 
-    public function test_manager_must_choose_a_division_for_pic_options(): void
+    public function test_supervisor_must_choose_a_division_for_pic_options(): void
     {
-        $manager = Account::factory()->manager()->create();
+        $supervisor = Account::factory()->supervisor()->create();
 
-        $this->actingAs($manager)
+        $this->actingAs($supervisor)
             ->getJson(route('api.task-options.pics'))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['division_id' => 'Divisi wajib diisi.']);
+    }
+
+    public function test_manager_may_list_pic_options_of_every_division(): void
+    {
+        $manager = Account::factory()->manager()->create();
+        $otherDivisionStaff = Account::factory()->employee()->create();
+
+        $response = $this->actingAs($manager)->getJson(route('api.task-options.pics'))->assertOk();
+
+        $this->assertContains($otherDivisionStaff->id, collect($response->json('data'))->pluck('id')->all());
     }
 
     public function test_admin_receives_staff_of_every_division_without_a_division_filter(): void

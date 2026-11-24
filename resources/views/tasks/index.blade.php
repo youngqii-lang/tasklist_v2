@@ -41,6 +41,21 @@
             @endforeach
         </nav>
 
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+            <div class="inline-flex rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-burgundy-100" role="group" aria-label="Cakupan tugas">
+                @foreach (['' => 'Semua Tugas', 'mine' => 'Tugas Saya'] as $scope => $label)
+                    <button
+                        type="button"
+                        @click="setScope('{{ $scope }}')"
+                        :class="filters.scope === '{{ $scope }}' ? 'bg-burgundy-600 text-white' : 'text-slate-600 hover:bg-burgundy-50'"
+                        :aria-pressed="filters.scope === '{{ $scope }}'"
+                        class="rounded-md px-4 py-1.5 text-sm font-medium transition"
+                    >{{ $label }}</button>
+                @endforeach
+            </div>
+            <p class="text-xs text-slate-500" x-text="isMyTasks ? 'Tugas dengan Anda sebagai PIC aktif.' : 'Seluruh tugas lintas divisi. Tugas di luar kewenangan Anda hanya dapat dilihat.'"></p>
+        </div>
+
         @include('tasks.partials.filters')
 
         <template x-if="usesTaskFilters">
@@ -62,13 +77,13 @@
         </template>
 
         <template x-if="view === 'timeline'">
-            <div x-data="taskTimeline(config, filters.division_id)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
+            <div x-data="taskTimeline(config, filters.division_id, filters.scope)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
                 @include('tasks.partials.timeline')
             </div>
         </template>
 
         <template x-if="view === 'calendar'">
-            <div x-data="taskCalendar(config, filters.division_id)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
+            <div x-data="taskCalendar(config, filters.division_id, filters.scope)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
                 @include('tasks.partials.calendar')
             </div>
         </template>

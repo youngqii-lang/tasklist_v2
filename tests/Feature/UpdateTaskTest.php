@@ -60,13 +60,21 @@ class UpdateTaskTest extends TestCase
         $this->assertDatabaseHas('tasks', ['id' => $this->task->id, 'title' => 'Judul baru', 'version' => 2]);
     }
 
-    public function test_manager_can_update_tasks_of_their_division_only(): void
+    public function test_supervisor_can_update_tasks_of_their_division_only(): void
+    {
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
+        $otherTask = Task::factory()->create();
+
+        $this->patchTask($supervisor, ['title' => 'Judul baru'])->assertOk();
+        $this->patchTask($supervisor, ['title' => 'Judul baru'], $otherTask)->assertForbidden();
+    }
+
+    public function test_manager_can_update_tasks_of_any_division(): void
     {
         $manager = Account::factory()->manager()->for($this->division)->create();
         $otherTask = Task::factory()->create();
 
-        $this->patchTask($manager, ['title' => 'Judul baru'])->assertOk();
-        $this->patchTask($manager, ['title' => 'Judul baru'], $otherTask)->assertForbidden();
+        $this->patchTask($manager, ['title' => 'Judul baru'], $otherTask)->assertOk();
     }
 
     public function test_staff_who_is_not_the_pic_cannot_update_the_task(): void
@@ -78,16 +86,23 @@ class UpdateTaskTest extends TestCase
         $this->assertDatabaseHas('tasks', ['id' => $this->task->id, 'title' => 'Judul lama']);
     }
 
-    public function test_only_admin_can_move_a_task_to_another_division(): void
+    public function test_supervisor_cannot_move_a_task_to_another_division(): void
     {
-        $manager = Account::factory()->manager()->for($this->division)->create();
-        $admin = Account::factory()->admin()->create();
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
         $otherDivision = Division::factory()->create();
 
-        $this->patchTask($manager, ['division_id' => $otherDivision->id])->assertForbidden();
-        $this->patchTask($admin, ['division_id' => $otherDivision->id])
-            ->assertOk()
-            ->assertJsonPath('data.division.id', $otherDivision->id);
+        $this->patchTask($supervisor, ['division_id' => $otherDivision->id])->assertForbidden();
+    }
+
+    public function test_admin_and_manager_can_move_a_task_to_another_division(): void
+    {
+        foreach ([Account::factory()->admin()->create(), Account::factory()->manager()->create()] as $account) {
+            $otherDivision = Division::factory()->create();
+
+            $this->patchTask($account, ['division_id' => $otherDivision->id], $this->task->fresh())
+                ->assertOk()
+                ->assertJsonPath('data.division.id', $otherDivision->id);
+        }
     }
 
     public function test_changes_are_recorded_with_before_and_after_values(): void

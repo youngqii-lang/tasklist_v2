@@ -29,6 +29,7 @@ class ShowTimelineRequest extends FormRequest
             'start_date' => ['nullable', 'date_format:Y-m-d'],
             'mode' => ['nullable', 'string', Rule::in(array_keys(TimelineService::MODE_DAYS))],
             'division_id' => ['nullable', 'integer', Rule::exists('divisions', 'id')],
+            'scope' => ['nullable', 'string', Rule::in(Task::SCOPES)],
         ];
     }
 
@@ -58,6 +59,7 @@ class ShowTimelineRequest extends FormRequest
             'start_date' => 'Tanggal mulai periode',
             'mode' => 'Mode tampilan',
             'division_id' => 'Divisi',
+            'scope' => 'Cakupan tugas',
         ];
     }
 }

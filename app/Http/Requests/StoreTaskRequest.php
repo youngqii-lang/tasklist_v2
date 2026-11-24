@@ -50,15 +50,16 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
-     * A PIC must be an active staff account. Admins may pick staff of any division; others only staff of the target division.
+     * A PIC must be an active account of a PIC role. Admins and managers may pick accounts of any division;
+     * supervisors only accounts of the target division.
      */
     protected function assignablePicRule(): Exists
     {
         $rule = Rule::exists('accounts', 'id')
             ->where('is_active', true)
-            ->whereIn('role_id', Role::whereIn('code_role', Role::STAFF_ROLES)->pluck('id')->all());
+            ->whereIn('role_id', Role::whereIn('code_role', Role::PIC_ROLES)->pluck('id')->all());
 
-        return $this->user()?->isAdmin() ? $rule : $rule->where('division_id', $this->integer('division_id'));
+        return $this->user()?->managesAllDivisions() ? $rule : $rule->where('division_id', $this->integer('division_id'));
     }
 
     /**
@@ -78,7 +79,7 @@ class StoreTaskRequest extends FormRequest
             'deadline.after_or_equal' => 'Deadline tidak boleh sebelum hari ini atau sebelum tanggal mulai.',
             'pic_ids.required' => 'PIC wajib dipilih untuk tugas berstatus To Do.',
             'pic_ids.*.distinct' => 'PIC yang sama tidak boleh dipilih lebih dari sekali.',
-            'pic_ids.*.exists' => 'PIC harus akun Staff aktif dari divisi yang dipilih.',
+            'pic_ids.*.exists' => 'PIC harus akun aktif yang berada dalam kewenangan Anda.',
         ];
     }
 

@@ -9,10 +9,11 @@ const rangeFormatter = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month:
 /**
  * Read-only weekly or two-weekly timeline of tasks and shared events across divisions.
  */
-export default (config, divisionId = '') => ({
+export default (config, divisionId = '', scope = '') => ({
     ...formatting,
     config,
     divisionId,
+    scope,
     mode: 'weekly',
     from: startOfWeek(new Date()),
     tasks: [],
@@ -56,6 +57,7 @@ export default (config, divisionId = '') => ({
 
     onFiltersChanged(filters) {
         this.divisionId = filters.division_id;
+        this.scope = filters.scope;
         this.load();
     },
 
@@ -81,7 +83,7 @@ export default (config, divisionId = '') => ({
 
         try {
             const { data } = await http(this.config.urls.timeline, {
-                query: { start_date: toDateString(this.from), mode: this.mode, division_id: this.divisionId },
+                query: { start_date: toDateString(this.from), mode: this.mode, division_id: this.divisionId, scope: this.scope },
             });
 
             if (ticket !== this.ticket) return;

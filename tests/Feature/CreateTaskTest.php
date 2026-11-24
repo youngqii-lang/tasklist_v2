@@ -71,24 +71,35 @@ class CreateTaskTest extends TestCase
         $this->assertDatabaseCount('tasks', 1);
     }
 
-    public function test_manager_cannot_create_a_task_for_another_division(): void
+    public function test_supervisor_cannot_create_a_task_for_another_division(): void
     {
-        $manager = Account::factory()->manager()->create();
+        $supervisor = Account::factory()->supervisor()->create();
 
-        $this->actingAs($manager)
+        $this->actingAs($supervisor)
             ->postJson(route('api.tasks.store'), $this->payload())
             ->assertForbidden();
 
         $this->assertDatabaseCount('tasks', 0);
     }
 
-    public function test_manager_without_division_cannot_create_a_task(): void
+    public function test_supervisor_without_division_cannot_create_a_task(): void
     {
-        $manager = Account::factory()->manager()->withoutDivision()->create();
+        $supervisor = Account::factory()->supervisor()->withoutDivision()->create();
 
-        $this->actingAs($manager)
+        $this->actingAs($supervisor)
             ->postJson(route('api.tasks.store'), $this->payload())
             ->assertForbidden();
+    }
+
+    public function test_manager_can_create_a_task_for_any_division_with_a_pic_of_that_division(): void
+    {
+        $manager = Account::factory()->manager()->create();
+        $pic = Account::factory()->employee()->for($this->division)->create();
+
+        $this->actingAs($manager)
+            ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$pic->id]]))
+            ->assertCreated()
+            ->assertJsonPath('data.division.id', $this->division->id);
     }
 
     public function test_staff_and_freelance_cannot_create_a_task(): void
@@ -231,24 +242,34 @@ class CreateTaskTest extends TestCase
         }
     }
 
-    public function test_pic_must_be_active_staff_from_the_target_division(): void
+    public function test_pic_must_be_an_active_non_admin_account_from_the_target_division(): void
     {
-        $manager = Account::factory()->manager()->for($this->division)->create();
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
         $invalidPics = [
             Account::factory()->employee()->create(),
             Account::factory()->employee()->for($this->division)->inactive()->create(),
-            Account::factory()->manager()->for($this->division)->create(),
-            Account::factory()->supervisor()->for($this->division)->create(),
+            Account::factory()->admin()->for($this->division)->create(),
         ];
 
         foreach ($invalidPics as $pic) {
-            $this->actingAs($manager)
+            $this->actingAs($supervisor)
                 ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$pic->id]]))
                 ->assertUnprocessable()
-                ->assertJsonValidationErrors(['pic_ids.0' => 'PIC harus akun Staff aktif dari divisi yang dipilih.']);
+                ->assertJsonValidationErrors(['pic_ids.0' => 'PIC harus akun aktif yang berada dalam kewenangan Anda.']);
         }
 
         $this->assertDatabaseCount('tasks', 0);
+    }
+
+    public function test_managers_and_supervisors_can_be_assigned_as_pic(): void
+    {
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
+        $managerPic = Account::factory()->manager()->for($this->division)->create();
+
+        $this->actingAs($supervisor)
+            ->postJson(route('api.tasks.store'), $this->payload(['pic_ids' => [$supervisor->id, $managerPic->id]]))
+            ->assertCreated()
+            ->assertJsonCount(2, 'data.pics');
     }
 
     public function test_admin_can_assign_active_staff_from_another_division(): void

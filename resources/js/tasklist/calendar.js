@@ -8,10 +8,11 @@ const timeFormatter = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute
 /**
  * Monthly calendar of shared events and deadline markers, with the accessible deadlines of the selected date below.
  */
-export default (config, divisionId = '') => ({
+export default (config, divisionId = '', scope = '') => ({
     ...formatting,
     config,
     divisionId,
+    scope,
     month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     selectedDate: toDateString(new Date()),
     events: [],
@@ -65,6 +66,7 @@ export default (config, divisionId = '') => ({
 
     onFiltersChanged(filters) {
         this.divisionId = filters.division_id;
+        this.scope = filters.scope;
         this.load();
     },
 
@@ -92,7 +94,7 @@ export default (config, divisionId = '') => ({
 
         try {
             const { data } = await http(this.config.urls.calendar, {
-                query: { month: this.monthKey, division_id: this.divisionId },
+                query: { month: this.monthKey, division_id: this.divisionId, scope: this.scope },
             });
 
             if (ticket !== this.tickets.month) return;
@@ -127,7 +129,7 @@ export default (config, divisionId = '') => ({
 
         try {
             const { data } = await http(this.config.urls.calendar_deadlines, {
-                query: { date: this.selectedDate, division_id: this.divisionId },
+                query: { date: this.selectedDate, division_id: this.divisionId, scope: this.scope },
             });
 
             if (ticket !== this.tickets.day) return;
