@@ -10,9 +10,11 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
-#[Fillable(['role_id', 'division_id', 'fullname', 'username', 'password'])]
+#[Fillable(['role_id', 'division_id', 'fullname', 'username', 'password', 'is_active'])]
 #[Hidden(['password'])]
 class Account extends Authenticatable
 {
@@ -111,7 +113,75 @@ class Account extends Authenticatable
     }
 
     /**
-     * Limit the query to active accounts that can be assigned as task PIC.
+     * Determine whether the account has the supervisor role.
+     */
+    public function isSupervisor(): bool
+    {
+        return $this->role?->code_role === Role::SUPERVISOR;
+    }
+
+    /**
+     * Admin and Managers work across divisions: they assign PICs from, and move tasks to, every division.
+     */
+    public function assignsPicsAcrossDivisions(): bool
+    {
+        return $this->isAdmin() || $this->isManager();
+    }
+
+    /**
+     * Codes of every permission the account's role grants, sorted.
+     *
+     * @return array<int, string>
+     */
+    public function permissionCodes(): array
+    {
+        return $this->role?->permissions->pluck('code')->sort()->values()->all() ?? [];
+    }
+
+    /**
+     * Get every PIC assignment of the account, active and released.
+     *
+     * @return HasMany<TaskAssignment, $this>
+     */
+    public function taskAssignments(): HasMany
+    {
+        return $this->hasMany(TaskAssignment::class);
+    }
+
+    /**
+     * Get the tasks the account is an active PIC of.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function assignedTasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_assignments')
+            ->wherePivotNull('unassigned_at')
+            ->withPivot(['id', 'assigned_by', 'assigned_at']);
+    }
+
+    /**
+     * Get the role audit of the account, oldest first.
+     *
+     * @return HasMany<AccountRoleChange, $this>
+     */
+    public function roleChanges(): HasMany
+    {
+        return $this->hasMany(AccountRoleChange::class)->orderBy('changed_at')->orderBy('id');
+    }
+
+    /**
+     * Get the task comments written by the account.
+     *
+     * @return HasMany<TaskComment, $this>
+     */
+    public function taskComments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class, 'author_id');
+    }
+
+    /**
+     * Limit the query to active Staff, Freelance, and Supervisors of any division, who can be assigned as task PIC.
      *
      * @param  Builder<Account>  $query
      */
@@ -121,6 +191,22 @@ class Account extends Authenticatable
         $query->where('is_active', true)
             ->whereHas('role', fn (Builder $role) => $role->whereIn('code_role', Role::PIC_ROLES))
             ->when($divisionId !== null, fn (Builder $accounts) => $accounts->where('division_id', $divisionId));
+    }
+
+    /**
+     * Limit the query to accounts the assigner may add as a new PIC: Admin and Managers from every division, a
+     * Supervisor only from the division they manage. Anyone else may not assign PICs.
+     *
+     * @param  Builder<Account>  $query
+     */
+    #[Scope]
+    protected function assignableAsPicBy(Builder $query, Account $assigner): void
+    {
+        $query->assignableAsPic();
+
+        if (! $assigner->assignsPicsAcrossDivisions()) {
+            $query->where('division_id', $assigner->isSupervisor() ? ($assigner->division_id ?? 0) : 0);
+        }
     }
 
     /**

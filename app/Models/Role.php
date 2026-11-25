@@ -15,22 +15,25 @@ class Role extends Model
     /** @use HasFactory<RoleFactory> */
     use HasFactory;
 
-    public const string ADMIN = 'admin';
+    public const string ADMIN = 'ADM';
 
-    public const string MANAGER = 'manager';
+    public const string MANAGER = 'MGR';
 
-    public const string SUPERVISOR = 'supervisor';
-
-    public const string EMPLOYEE = 'employee';
-
-    public const string FREELANCE = 'freelance';
+    public const string SUPERVISOR = 'SPV';
 
     /**
-     * Roles whose accounts can be assigned as task PIC. Admins maintain the system and are never PIC.
+     * Shown as Staff.
+     */
+    public const string EMPLOYEE = 'EMP';
+
+    public const string FREELANCE = 'FRL';
+
+    /**
+     * Roles whose accounts can be assigned as task PIC.
      *
      * @var list<string>
      */
-    public const array PIC_ROLES = [self::MANAGER, self::SUPERVISOR, self::EMPLOYEE, self::FREELANCE];
+    public const array PIC_ROLES = [self::EMPLOYEE, self::FREELANCE, self::SUPERVISOR];
 
     /**
      * Staff roles (Staff and Freelance). Managers may only manage the accounts of these roles.
@@ -64,5 +67,13 @@ class Role extends Model
     public function permissions(): BelongsToMany
     {
         return $this->belongsToMany(Permission::class, 'role_permissions');
+    }
+
+    /**
+     * Whether this role grants the permission.
+     */
+    public function hasPermission(string $code): bool
+    {
+        return $this->permissions->contains('code', $code);
     }
 }
