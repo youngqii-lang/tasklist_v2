@@ -1,46 +1,57 @@
 <?php
 
-use App\Models\Task;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // The Tasklist API is called from the logged-in Blade pages, so it uses the web session and CSRF token.
+        $middleware->api(prepend: [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            ValidateCsrfToken::class,
+        ]);
+
+        $middleware->redirectGuestsTo(
+            fn (Request $request) => $request->is('api/*') ? null : route('login'),
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
-        $exceptions->render(function (NotFoundHttpException $exception, Request $request) {
-            if (! $request->is('api/*')) {
-                return null;
+        $exceptions->render(function (AuthenticationException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'Silakan login terlebih dahulu.'], 401);
             }
-
-            $previous = $exception->getPrevious();
-            $model = $previous instanceof ModelNotFoundException ? $previous->getModel() : null;
-
-            return response()->json([
-                'message' => $model === Task::class ? 'Tugas tidak ditemukan atau telah dihapus.' : 'Data tidak ditemukan.',
-            ], 404);
         });
 
         $exceptions->render(function (AccessDeniedHttpException $exception, Request $request) {
-            if (! $request->is('api/*') || $exception->getMessage() !== 'This action is unauthorized.') {
-                return null;
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'Anda tidak memiliki akses untuk melakukan aksi ini.'], 403);
             }
+        });
 
-            return response()->json(['message' => 'Anda tidak memiliki akses untuk melakukan tindakan ini.'], 403);
+        $exceptions->render(function (NotFoundHttpException $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json(['message' => 'Data tidak ditemukan.'], 404);
+            }
         });
     })->create();

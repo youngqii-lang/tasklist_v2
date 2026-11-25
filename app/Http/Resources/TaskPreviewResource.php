@@ -2,17 +2,14 @@
 
 namespace App\Http\Resources;
 
-use App\Models\Account;
-use App\Models\Task;
+use App\Enums\TaskStatus;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * The short task summary shown in the calendar pop-up.
- *
- * @mixin Task
+ * Summary of one task for the Calendar pop-up: what the Task Card shows plus its description, whether it is overdue,
+ * and what the account may do with it. Evidence, history, and reviews stay behind the task detail.
  */
-class TaskPreviewResource extends JsonResource
+class TaskPreviewResource extends TaskResource
 {
     /**
      * Transform the resource into an array.
@@ -22,21 +19,9 @@ class TaskPreviewResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'title' => $this->title,
-            'start_date' => $this->start_date?->toDateString(),
-            'deadline' => $this->deadline?->toDateString(),
-            'pics' => $this->pics->map(fn (Account $pic) => ['id' => $pic->id, 'fullname' => $pic->fullname])->all(),
-            'status' => $this->status,
-            'status_label' => Task::STATUS_LABELS[$this->status] ?? $this->status,
-            'is_overdue' => $this->isOverdue(),
-            'board' => [
-                'task_id' => $this->id,
-                'filters' => [
-                    'division_id' => $this->division_id,
-                    'status' => $this->status,
-                ],
-            ],
+            ...parent::toArray($request),
+            'description' => $this->description,
+            'is_overdue' => $this->status !== TaskStatus::Done && $this->deadline !== null && $this->deadline->lt(today()),
         ];
     }
 }

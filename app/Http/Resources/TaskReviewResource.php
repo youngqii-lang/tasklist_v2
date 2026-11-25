@@ -2,13 +2,9 @@
 
 namespace App\Http\Resources;
 
-use App\Models\TaskReview;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @mixin TaskReview
- */
 class TaskReviewResource extends JsonResource
 {
     /**
@@ -20,14 +16,16 @@ class TaskReviewResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'decision' => $this->decision,
-            'decision_label' => TaskReview::DECISION_LABELS[$this->decision] ?? $this->decision,
+            'task_id' => $this->task_id,
+            'cycle' => $this->cycle,
+            'decision' => $this->decision->value,
+            'decision_label' => $this->decision->label(),
             'note' => $this->note,
-            'reviewer' => $this->whenLoaded('reviewer', fn () => $this->reviewer ? [
+            'reviewer' => $this->reviewer ? [
                 'id' => $this->reviewer->id,
                 'fullname' => $this->reviewer->fullname,
-            ] : null),
-            'created_at' => $this->created_at?->toIso8601String(),
+            ] : null,
+            'created_at' => $this->created_at?->toIso8601ZuluString(),
         ];
     }
 }

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
+use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
@@ -35,31 +38,21 @@ class TasklistController extends Controller
                         'fullname' => $account->fullname,
                         'division' => $account->division?->name,
                     ]),
-                'statuses' => $this->options(Task::STATUS_LABELS),
-                'priorities' => $this->options(Task::PRIORITY_LABELS),
+                'statuses' => collect(TaskStatus::cases())->map(fn (TaskStatus $status) => ['value' => $status->value, 'label' => $status->label()])->all(),
+                'priorities' => collect(TaskPriority::cases())->map(fn (TaskPriority $priority) => ['value' => $priority->value, 'label' => $priority->label()])->all(),
                 'urls' => [
                     'tasks' => route('api.tasks.index'),
-                    'summary' => route('api.tasks.summary'),
-                    'options' => route('api.task-options.index'),
-                    'pics' => route('api.task-options.pics'),
-                    'timeline' => route('api.timeline'),
-                    'calendar' => route('api.calendar.month'),
-                    'calendar_deadlines' => route('api.calendar.deadlines'),
+                    'meta' => route('api.tasks.meta'),
+                    'summary' => route('api.tasks.monitoring'),
+                    'options' => route('api.tasks.create-options'),
+                    'timeline' => route('api.tasks.schedule'),
+                    'calendar' => route('api.tasks.calendar'),
                 ],
                 'evidence' => [
-                    'extensions' => config('tasklist.evidence.extensions'),
-                    'max_size_kb' => config('tasklist.evidence.max_size_kb'),
+                    'extensions' => StoreTaskEvidenceRequest::MIMES,
+                    'max_size_kb' => StoreTaskEvidenceRequest::maxKilobytes(),
                 ],
             ],
         ]);
-    }
-
-    /**
-     * @param  array<string, string>  $labels
-     * @return list<array{value: string, label: string}>
-     */
-    protected function options(array $labels): array
-    {
-        return collect($labels)->map(fn (string $label, string $value) => ['value' => $value, 'label' => $label])->values()->all();
     }
 }

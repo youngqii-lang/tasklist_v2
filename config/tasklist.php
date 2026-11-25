@@ -4,19 +4,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Task Evidence
+    | Task evidence uploads
     |--------------------------------------------------------------------------
     |
-    | Evidence files are stored on a private disk and only served through
-    | the Tasklist API after the permission check. The maximum size is in
-    | kilobytes.
+    | The largest evidence file a PIC may upload, in kilobytes. Keep it at or below PHP's upload_max_filesize and
+    | post_max_size, or larger files fail before they reach validation.
     |
     */
 
     'evidence' => [
-        'disk' => env('TASKLIST_EVIDENCE_DISK', 'local'),
-        'max_size_kb' => (int) env('TASKLIST_EVIDENCE_MAX_KB', 10240),
-        'extensions' => ['doc', 'docx', 'pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        'max_kilobytes' => (int) env('TASK_EVIDENCE_MAX_KB', 10240),
     ],
 
 ];
