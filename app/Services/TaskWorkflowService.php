@@ -15,9 +15,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * Status workflow following the TASK-17 transition matrix.
  *
- * A PIC can move their own task from Back Log through To Do and On Process up to Ready Review, and take it back
- * from Ready Review to On Process; reviewing, revising and finishing stay with the admin, manager or supervisor
- * who manages the task.
+ * Only a PIC moves their own task through the work stages: Back Log to To Do, On Process and Ready Review, and back
+ * from Ready Review to On Process. The admin, manager or supervisor who manages the task only moves it to On Review,
+ * Done or back to Back Log: starting and deciding the review, and finishing a task that needs no review.
  */
 class TaskWorkflowService
 {
@@ -27,9 +27,9 @@ class TaskWorkflowService
     protected const string BY_MANAGER = 'manager';
 
     /**
-     * The transition may be done by a PIC of the task or by its manager.
+     * The transition may only be done by a current PIC of the task.
      */
-    protected const string BY_PIC_OR_MANAGER = 'pic_or_manager';
+    protected const string BY_PIC = 'pic';
 
     /**
      * Allowed transitions: from status => [to status => who may do it].
@@ -37,10 +37,10 @@ class TaskWorkflowService
      * @var array<string, array<string, string>>
      */
     protected const array TRANSITIONS = [
-        Task::STATUS_BACKLOG => [Task::STATUS_TODO => self::BY_PIC_OR_MANAGER],
-        Task::STATUS_TODO => [Task::STATUS_IN_PROGRESS => self::BY_PIC_OR_MANAGER],
-        Task::STATUS_IN_PROGRESS => [Task::STATUS_READY_REVIEW => self::BY_PIC_OR_MANAGER, Task::STATUS_DONE => self::BY_MANAGER],
-        Task::STATUS_READY_REVIEW => [Task::STATUS_ON_REVIEW => self::BY_MANAGER, Task::STATUS_IN_PROGRESS => self::BY_PIC_OR_MANAGER],
+        Task::STATUS_BACKLOG => [Task::STATUS_TODO => self::BY_PIC],
+        Task::STATUS_TODO => [Task::STATUS_IN_PROGRESS => self::BY_PIC],
+        Task::STATUS_IN_PROGRESS => [Task::STATUS_READY_REVIEW => self::BY_PIC, Task::STATUS_DONE => self::BY_MANAGER],
+        Task::STATUS_READY_REVIEW => [Task::STATUS_ON_REVIEW => self::BY_MANAGER, Task::STATUS_IN_PROGRESS => self::BY_PIC],
         Task::STATUS_ON_REVIEW => [Task::STATUS_DONE => self::BY_MANAGER, Task::STATUS_BACKLOG => self::BY_MANAGER],
     ];
 
@@ -93,8 +93,8 @@ class TaskWorkflowService
             }
 
             if (! $this->isAllowedBy($actor, $task, $allowedBy)) {
-                throw new AuthorizationException($allowedBy === self::BY_PIC_OR_MANAGER
-                    ? 'Hanya PIC tugas atau Admin/Manajer/Supervisor yang berwenang yang dapat melakukan perpindahan status ini.'
+                throw new AuthorizationException($allowedBy === self::BY_PIC
+                    ? 'Hanya PIC tugas ini yang dapat melakukan perpindahan status ini.'
                     : 'Hanya Admin, Manajer, atau Supervisor yang berwenang yang dapat melakukan perpindahan status ini.');
             }
 
@@ -163,11 +163,9 @@ class TaskWorkflowService
      */
     protected function isAllowedBy(Account $actor, Task $task, string $allowedBy): bool
     {
-        $manages = Gate::forUser($actor)->allows('manage', $task);
-
         return match ($allowedBy) {
-            self::BY_PIC_OR_MANAGER => $manages || $task->hasActivePic($actor),
-            self::BY_MANAGER => $manages,
+            self::BY_PIC => $task->hasActivePic($actor),
+            self::BY_MANAGER => Gate::forUser($actor)->allows('manage', $task),
         };
     }
 

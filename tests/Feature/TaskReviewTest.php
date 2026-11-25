@@ -142,7 +142,7 @@ class TaskReviewTest extends TestCase
         TaskEvidence::factory()->for($this->task)->for($this->pic, 'submitter')->create();
 
         $steps = [
-            [$this->manager, Task::STATUS_TODO],
+            [$this->pic, Task::STATUS_TODO],
             [$this->pic, Task::STATUS_IN_PROGRESS],
             [$this->pic, Task::STATUS_READY_REVIEW],
             [$this->manager, Task::STATUS_ON_REVIEW],
