@@ -43,7 +43,7 @@
                     <span x-show="columnDropState(status.value) === 'origin'" x-cloak class="text-[11px] font-medium text-slate-500">Posisi saat ini</span>
                     <span x-show="columnDropState(status.value) === 'refused'" x-cloak class="flex items-center gap-1 text-[11px] font-medium text-slate-500">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-                        Tidak diizinkan
+                        <span x-text="refusedLabel(status.value)"></span>
                     </span>
                 </header>
 
@@ -161,6 +161,7 @@
                                         <span class="flex-1">
                                             <span class="block font-medium text-slate-800" x-text="option.label"></span>
                                             <span class="block text-xs text-slate-500" x-text="'→ ' + option.target"></span>
+                                            <span x-show="option.hint" class="block text-xs font-medium text-amber-700" x-text="option.hint"></span>
                                         </span>
                                     </button>
                                 </template>
@@ -189,7 +190,7 @@
                :class="!drag.over || drag.over === drag.task?.status ? 'text-slate-500' : (isDropAllowed(drag.over) ? 'text-emerald-700' : 'text-red-600')"
                x-text="!drag.over || drag.over === drag.task?.status
                    ? (drag.task?.status_label + ' · geser ke kolom hijau')
-                   : (isDropAllowed(drag.over) ? '→ ' + statusLabel(drag.over) : 'Tidak diizinkan ke ' + statusLabel(drag.over))"></p>
+                   : (isDropAllowed(drag.over) ? '→ ' + statusLabel(drag.over) : refusedLabel(drag.over) + ' · ' + statusLabel(drag.over))"></p>
         </div>
     </div>
 </section>

@@ -7,6 +7,7 @@ use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
+use App\Models\TaskEvidence;
 use App\Models\TaskReview;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -138,6 +139,7 @@ class TaskReviewTest extends TestCase
     public function test_review_cycle_can_repeat_and_keeps_every_decision(): void
     {
         $this->decide($this->manager, ['decision' => 'revision_requested', 'note' => 'Revisi pertama'])->assertOk();
+        TaskEvidence::factory()->for($this->task)->for($this->pic, 'submitter')->create();
 
         $steps = [
             [$this->manager, Task::STATUS_TODO],

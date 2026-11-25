@@ -179,6 +179,9 @@ class TaskWorkflowService
     }
 
     /**
+     * Moving from Back Log up to On Process has no requirements, since the reviewer checks the work afterwards.
+     * Handing work in for review always needs evidence; finishing without review needs it when the task asks for it.
+     *
      * @throws InvalidTaskTransitionException
      */
     protected function ensureRequirementsAreMet(Task $task, string $toStatus): void
@@ -187,15 +190,14 @@ class TaskWorkflowService
             throw new InvalidTaskTransitionException('Tugas ini wajib review, kirim ke Ready Review terlebih dahulu.');
         }
 
-        $isSubmission = $task->status === Task::STATUS_IN_PROGRESS
-            && in_array($toStatus, [Task::STATUS_READY_REVIEW, Task::STATUS_DONE], true);
-
-        if ($isSubmission && $task->evidence_required && ! $task->evidences()->exists()) {
-            throw new InvalidTaskTransitionException('Tugas ini wajib melampirkan evidence sebelum dikirim.');
+        if ($toStatus === Task::STATUS_READY_REVIEW && ! $task->evidences()->exists()) {
+            throw new InvalidTaskTransitionException('Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
         }
 
-        if ($toStatus === Task::STATUS_TODO && ($task->deadline === null || ! $task->pics()->exists())) {
-            throw new InvalidTaskTransitionException('Tugas wajib memiliki PIC dan deadline sebelum dipindahkan ke To Do.');
+        $finishesWithoutReview = $task->status === Task::STATUS_IN_PROGRESS && $toStatus === Task::STATUS_DONE;
+
+        if ($finishesWithoutReview && $task->evidence_required && ! $task->evidences()->exists()) {
+            throw new InvalidTaskTransitionException('Tugas ini wajib melampirkan evidence sebelum diselesaikan.');
         }
     }
 }

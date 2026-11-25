@@ -33,8 +33,15 @@ export default {
         return task.abilities.transitions.length > 0 && !this.movingIds[task.id];
     },
 
+    /** Ready Review always needs evidence; the API checks it too, this only explains it before the request. */
+    needsEvidence(task, status) {
+        return status === 'ready_review' && task?.evidences_count === 0;
+    },
+
     isDropAllowed(status) {
-        return Boolean(this.drag.task?.abilities.transitions.includes(status));
+        const task = this.drag.task;
+
+        return Boolean(task?.abilities.transitions.includes(status)) && !this.needsEvidence(task, status);
     },
 
     /** How a column looks while a card is being dragged: its own column, an allowed target, or a refused one. */
@@ -43,6 +50,15 @@ export default {
         if (status === this.drag.task.status) return 'origin';
 
         return this.isDropAllowed(status) ? 'allowed' : 'refused';
+    },
+
+    /** Short reason shown on a refused column and on the dragged card. */
+    refusedLabel(status) {
+        const task = this.drag.task;
+
+        return task?.abilities.transitions.includes(status) && this.needsEvidence(task, status)
+            ? 'Butuh evidence'
+            : 'Tidak diizinkan';
     },
 
     dropHint(status) {
@@ -195,6 +211,7 @@ export default {
             status,
             label: transitionLabel(task.status, status),
             target: this.statusLabel(status),
+            hint: this.needsEvidence(task, status) ? 'Lampirkan evidence terlebih dahulu' : null,
         }));
     },
 
@@ -207,6 +224,12 @@ export default {
     dropOn(task, status) {
         if (!task.abilities.transitions.includes(status)) {
             Alpine.store('toast').error(this.rejectionReason(task, status));
+
+            return;
+        }
+
+        if (this.needsEvidence(task, status)) {
+            Alpine.store('toast').error('Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
 
             return;
         }

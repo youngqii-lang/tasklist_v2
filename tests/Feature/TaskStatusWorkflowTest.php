@@ -7,6 +7,7 @@ use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
+use App\Models\TaskEvidence;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,6 +47,16 @@ class TaskStatusWorkflowTest extends TestCase
     {
         $task = Task::factory()->for($this->division)->create(['status' => $status] + $attributes);
         TaskAssignment::factory()->for($task)->for($this->pic, 'account')->create();
+
+        return $task;
+    }
+
+    /**
+     * Attach evidence from the test PIC, which every task needs before Ready Review.
+     */
+    protected function withEvidence(Task $task): Task
+    {
+        TaskEvidence::factory()->for($task)->for($this->pic, 'submitter')->create();
 
         return $task;
     }
@@ -94,7 +105,7 @@ class TaskStatusWorkflowTest extends TestCase
 
     public function test_pic_can_move_own_task_from_backlog_up_to_ready_review_but_not_further(): void
     {
-        $task = $this->task(Task::STATUS_BACKLOG);
+        $task = $this->withEvidence($this->task(Task::STATUS_BACKLOG));
 
         $this->actingAs($this->pic)->getJson(route('api.tasks.show', $task))
             ->assertJsonPath('data.abilities.transitions', [Task::STATUS_TODO]);
@@ -118,28 +129,23 @@ class TaskStatusWorkflowTest extends TestCase
         $this->assertSame(Task::STATUS_BACKLOG, $task->fresh()->status);
     }
 
-    public function test_pic_still_needs_a_deadline_before_todo(): void
+    public function test_moving_up_to_on_process_has_no_requirements(): void
     {
-        $task = $this->task(Task::STATUS_BACKLOG, ['deadline' => null]);
+        $withoutPicOrDeadline = Task::factory()->for($this->division)->create(['status' => Task::STATUS_BACKLOG, 'deadline' => null]);
 
-        $this->moveTo($this->pic, $task, Task::STATUS_TODO)
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Tugas wajib memiliki PIC dan deadline sebelum dipindahkan ke To Do.');
-    }
+        $this->moveTo($this->manager, $withoutPicOrDeadline, Task::STATUS_TODO)->assertOk();
+        $this->moveTo($this->manager, $withoutPicOrDeadline, Task::STATUS_IN_PROGRESS)->assertOk();
 
-    public function test_backlog_task_needs_a_pic_and_deadline_before_todo(): void
-    {
-        $task = Task::factory()->for($this->division)->create(['status' => Task::STATUS_BACKLOG]);
+        $picTaskWithoutDeadline = $this->task(Task::STATUS_BACKLOG, ['deadline' => null]);
 
-        $this->moveTo($this->manager, $task, Task::STATUS_TODO)
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Tugas wajib memiliki PIC dan deadline sebelum dipindahkan ke To Do.');
+        $this->moveTo($this->pic, $picTaskWithoutDeadline, Task::STATUS_TODO)->assertOk();
+        $this->moveTo($this->pic, $picTaskWithoutDeadline, Task::STATUS_IN_PROGRESS)->assertOk();
     }
 
     public function test_pic_and_manager_can_start_and_submit_the_work(): void
     {
         foreach ([$this->pic, $this->manager] as $account) {
-            $task = $this->task(Task::STATUS_TODO);
+            $task = $this->withEvidence($this->task(Task::STATUS_TODO));
 
             $this->moveTo($account, $task, Task::STATUS_IN_PROGRESS)->assertOk();
             $this->moveTo($account, $task, Task::STATUS_READY_REVIEW)->assertOk()->assertJsonPath('data.status_label', 'Ready Review');
@@ -148,7 +154,7 @@ class TaskStatusWorkflowTest extends TestCase
 
     public function test_task_without_review_requirement_can_also_be_sent_to_ready_review(): void
     {
-        $task = $this->task(Task::STATUS_IN_PROGRESS, ['requires_review' => false]);
+        $task = $this->withEvidence($this->task(Task::STATUS_IN_PROGRESS, ['requires_review' => false]));
 
         $this->moveTo($this->pic, $task, Task::STATUS_READY_REVIEW)->assertOk();
     }
@@ -221,7 +227,7 @@ class TaskStatusWorkflowTest extends TestCase
 
     public function test_revised_task_is_reactivated_and_resubmitted_by_the_pic(): void
     {
-        $task = $this->task(Task::STATUS_ON_REVIEW, ['requires_review' => true]);
+        $task = $this->withEvidence($this->task(Task::STATUS_ON_REVIEW, ['requires_review' => true]));
 
         $this->moveTo($this->manager, $task, Task::STATUS_BACKLOG, ['note' => 'Revisi'])->assertOk();
         $this->moveTo($this->manager, $task, Task::STATUS_TODO)->assertOk();
