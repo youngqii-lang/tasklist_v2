@@ -10,6 +10,9 @@
         @pointercancel.window="cancelDrag()"
         @blur.window="cancelDrag()"
         @keydown.escape.window="cancelDrag()"
+        x-on:show-deadlines-in-table.window="showDeadlinesInTable($event.detail.date)"
+        @scroll.window.passive="tableMenu.task && closeTableMenu()"
+        @resize.window="tableMenu.task && closeTableMenu()"
         class="mx-auto max-w-7xl"
     >
         <div class="flex flex-wrap items-end justify-between gap-4">

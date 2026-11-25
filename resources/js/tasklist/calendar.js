@@ -4,6 +4,9 @@ import { addDays, formatting, startOfWeek, toDateString } from './format';
 const monthFormatter = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' });
 const longDateFormatter = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const timeFormatter = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' });
+const monthNames = Array.from({ length: 12 }, (_, index) =>
+    new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, index, 1)));
+const ARROW_DAYS = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
 
 /**
  * Monthly calendar of shared events and deadline markers, with the accessible deadlines of the selected date below.
@@ -23,6 +26,7 @@ export default (config, divisionId = '', scope = '') => ({
     tickets: { month: 0, day: 0, preview: 0 },
     preview: { open: false, loading: false, data: null, error: null },
     weekdays: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+    monthNames,
 
     init() {
         this.load();
@@ -36,6 +40,24 @@ export default (config, divisionId = '', scope = '') => ({
         const [year, month, day] = this.selectedDate.split('-').map(Number);
 
         return longDateFormatter.format(new Date(year, month - 1, day));
+    },
+
+    get yearOptions() {
+        const current = new Date().getFullYear();
+        const years = Array.from({ length: 7 }, (_, index) => current - 3 + index);
+
+        return years.includes(this.month.getFullYear()) ? years : [...years, this.month.getFullYear()].sort();
+    },
+
+    /** Totals for the shown month, so busy or late months stand out before opening a date. */
+    get monthSummary() {
+        const deadlines = Object.values(this.deadlines);
+
+        return {
+            deadlines: deadlines.reduce((sum, day) => sum + day.total, 0),
+            overdue: deadlines.reduce((sum, day) => sum + day.overdue, 0),
+            events: this.events.length,
+        };
     },
 
     get monthKey() {
@@ -58,6 +80,7 @@ export default (config, divisionId = '', scope = '') => ({
                 day: date.getDate(),
                 inMonth: date.getMonth() === this.month.getMonth(),
                 isToday: key === today,
+                isWeekend: date.getDay() === 0 || date.getDay() === 6,
                 deadline: this.deadlines[key] ?? null,
                 events: this.events.filter((event) => event.start <= key && event.end >= key),
             };
@@ -68,6 +91,41 @@ export default (config, divisionId = '', scope = '') => ({
         this.divisionId = filters.division_id;
         this.scope = filters.scope;
         this.load();
+    },
+
+    jumpToMonth(monthIndex, year) {
+        this.month = new Date(Number(year), Number(monthIndex), 1);
+        this.load({ keepSelection: false });
+    },
+
+    /** Arrow keys move the selected date by a day or a week, Page Up/Down by a month. */
+    onGridKeydown(event) {
+        let target = null;
+
+        if (ARROW_DAYS[event.key] !== undefined) {
+            target = addDays(this.selectedAsDate(), ARROW_DAYS[event.key]);
+        } else if (event.key === 'PageUp' || event.key === 'PageDown') {
+            const current = this.selectedAsDate();
+            target = new Date(current.getFullYear(), current.getMonth() + (event.key === 'PageUp' ? -1 : 1), current.getDate());
+        }
+
+        if (!target) return;
+
+        event.preventDefault();
+        const key = toDateString(target);
+        this.selectDate(key);
+        this.$nextTick(() => this.$root.querySelector(`[data-date="${key}"]`)?.focus());
+    },
+
+    selectedAsDate() {
+        const [year, month, day] = this.selectedDate.split('-').map(Number);
+
+        return new Date(year, month - 1, day);
+    },
+
+    /** Open every deadline of the selected date in the Table, where they can be sorted and paged. */
+    showInTable() {
+        this.$dispatch('show-deadlines-in-table', { date: this.selectedDate });
     },
 
     shiftMonth(direction) {

@@ -24,7 +24,7 @@ const monthNames = Array.from({ length: 12 }, (_, index) =>
     new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, index, 1)));
 const DEFAULT_SORT = { sort: 'created_at', direction: 'desc' };
 const BOARD_LIMIT = 100;
-const TABLE_PAGE_SIZE = 15;
+const TABLE_PAGE_SIZES = [15, 25, 50, 100];
 
 /**
  * The Tasklist page: shared filters, the Board and Table views (same API, same filters), the KPI summary and drag-and-drop.
@@ -41,6 +41,9 @@ export default (config) => ({
     sort: DEFAULT_SORT.sort,
     direction: DEFAULT_SORT.direction,
     page: 1,
+    perPage: TABLE_PAGE_SIZES[0],
+    tablePageSizes: TABLE_PAGE_SIZES,
+    tableMenu: { task: null, top: 0, right: 0 },
     board: { tasks: [], counts: {}, total: 0, loading: true, error: null },
     table: { tasks: [], meta: null, loading: true, error: null },
     summary: { data: null, loading: true, error: null },
@@ -116,6 +119,7 @@ export default (config) => ({
         this.sort = params.get('sort') ?? DEFAULT_SORT.sort;
         this.direction = params.get('direction') === 'asc' ? 'asc' : 'desc';
         this.page = Math.max(1, Number(params.get('page')) || 1);
+        this.perPage = TABLE_PAGE_SIZES.includes(Number(params.get('per_page'))) ? Number(params.get('per_page')) : TABLE_PAGE_SIZES[0];
         this.syncPeriodFromFilters();
     },
 
@@ -186,6 +190,7 @@ export default (config) => ({
             sort: this.sort === DEFAULT_SORT.sort ? '' : this.sort,
             direction: this.direction === DEFAULT_SORT.direction ? '' : this.direction,
             page: this.page > 1 && this.view === 'table' ? this.page : '',
+            per_page: this.perPage !== TABLE_PAGE_SIZES[0] ? this.perPage : '',
         };
 
         Object.entries(state).forEach(([key, value]) => (value === '' ? params.delete(key) : params.set(key, value)));
@@ -267,7 +272,7 @@ export default (config) => ({
         return this.latest(
             'table',
             () => http(this.config.urls.tasks, {
-                query: { ...this.activeFilters(), sort: this.sort, direction: this.direction, per_page: TABLE_PAGE_SIZE, page: this.page },
+                query: { ...this.activeFilters(), sort: this.sort, direction: this.direction, per_page: this.perPage, page: this.page },
             }),
             (response) => {
                 this.table.tasks = response.data;
@@ -290,14 +295,23 @@ export default (config) => ({
         );
     },
 
+    /** Clicking the sorted column again flips the direction; another column starts in its natural direction. */
     sortBy(column) {
         if (this.sort === column) {
             this.direction = this.direction === 'asc' ? 'desc' : 'asc';
-        } else {
-            this.sort = column;
-            this.direction = ['title', 'deadline', 'start_date'].includes(column) ? 'asc' : 'desc';
+            this.page = 1;
+            this.syncUrl();
+            this.refresh();
+
+            return;
         }
 
+        this.setSort(column);
+    },
+
+    setSort(column) {
+        this.sort = column;
+        this.direction = ['title', 'deadline', 'start_date'].includes(column) ? 'asc' : 'desc';
         this.page = 1;
         this.syncUrl();
         this.refresh();
@@ -310,9 +324,88 @@ export default (config) => ({
     },
 
     goToPage(page) {
-        this.page = page;
+        const lastPage = this.table.meta?.last_page ?? 1;
+
+        this.page = Math.min(Math.max(1, page), Math.max(1, lastPage));
         this.syncUrl();
         this.loadTable();
+        document.getElementById('table-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+
+    setPerPage(size) {
+        this.perPage = Number(size);
+        this.page = 1;
+        this.syncUrl();
+        this.loadTable();
+    },
+
+    /** "1–15 dari 120" for the current table page. */
+    get tableRange() {
+        const meta = this.table.meta;
+
+        if (!meta || meta.total === 0) return '';
+
+        return `${meta.from}–${meta.to} dari ${meta.total}`;
+    },
+
+    /** Page numbers around the current page, with gaps marked as null: 1 … 4 5 [6] 7 8 … 20. */
+    get tablePages() {
+        const last = this.table.meta?.last_page ?? 1;
+        const current = this.page;
+        const pages = [];
+
+        for (let number = 1; number <= last; number++) {
+            if (number === 1 || number === last || Math.abs(number - current) <= 1) {
+                pages.push(number);
+            } else if (pages[pages.length - 1] !== null) {
+                pages.push(null);
+            }
+        }
+
+        return pages;
+    },
+
+    /** Clicking anywhere on a row opens the task, except on its own buttons and links. */
+    onTableRowClick(event, task) {
+        if (event.target.closest('button, a, [role="menu"]')) return;
+
+        this.openTask(task.id);
+    },
+
+    /** The row menu is positioned on the page, so the scrollable table never cuts it off. */
+    toggleTableMenu(event, task) {
+        if (this.tableMenu.task?.id === task.id) {
+            this.closeTableMenu();
+
+            return;
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        this.tableMenu = { task, top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) };
+    },
+
+    closeTableMenu() {
+        this.tableMenu = { task: null, top: 0, right: 0 };
+    },
+
+    chooseTableMove(status) {
+        const task = this.tableMenu.task;
+
+        this.closeTableMenu();
+        if (task) this.dropOn(task, status);
+    },
+
+    /**
+     * From the calendar: list every deadline of a date in the Table, with the same division and scope as the calendar.
+     * Other filters are cleared so no deadline of that date is hidden.
+     */
+    showDeadlinesInTable(date) {
+        this.filters = { ...DEFAULT_FILTERS, division_id: this.filters.division_id, scope: this.filters.scope };
+        this.period = { ...emptyPeriod(), mode: 'date', date };
+        this.sort = 'priority';
+        this.direction = 'desc';
+        this.view = 'table';
+        this.applyPeriod();
     },
 
     /**

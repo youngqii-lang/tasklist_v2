@@ -3,8 +3,37 @@ import { http } from '../http';
 import { addDays, formatting, parseDate, startOfWeek, toDateString } from './format';
 
 const MODE_DAYS = { weekly: 7, biweekly: 14 };
+const DAY_MS = 86400000;
 const dayFormatter = new Intl.DateTimeFormat('id-ID', { weekday: 'short' });
 const rangeFormatter = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/**
+ * Spread items over as few rows as possible: an item goes into the first row where it does not overlap the previous one.
+ * Items need `startIndex` and `endIndex` (inclusive day positions in the period).
+ *
+ * @template T
+ * @param {Array<T & { startIndex: number, endIndex: number }>} items
+ * @returns {Array<Array<T>>}
+ */
+export function packLanes(items) {
+    const lanes = [];
+    const laneEnds = [];
+    const sorted = [...items].sort((a, b) => a.startIndex - b.startIndex || b.endIndex - a.endIndex);
+
+    sorted.forEach((item) => {
+        const laneIndex = laneEnds.findIndex((end) => end < item.startIndex);
+
+        if (laneIndex === -1) {
+            lanes.push([item]);
+            laneEnds.push(item.endIndex);
+        } else {
+            lanes[laneIndex].push(item);
+            laneEnds[laneIndex] = item.endIndex;
+        }
+    });
+
+    return lanes;
+}
 
 /**
  * Read-only weekly or two-weekly timeline of tasks and shared events across divisions.
@@ -16,6 +45,7 @@ export default (config, divisionId = '', scope = '') => ({
     scope,
     mode: 'weekly',
     from: startOfWeek(new Date()),
+    compact: true,
     tasks: [],
     events: [],
     loading: true,
@@ -27,10 +57,14 @@ export default (config, divisionId = '', scope = '') => ({
         this.load();
     },
 
+    get dayCount() {
+        return MODE_DAYS[this.mode];
+    },
+
     get days() {
         const today = toDateString(new Date());
 
-        return Array.from({ length: MODE_DAYS[this.mode] }, (_, index) => {
+        return Array.from({ length: this.dayCount }, (_, index) => {
             const date = addDays(this.from, index);
 
             return {
@@ -44,15 +78,32 @@ export default (config, divisionId = '', scope = '') => ({
     },
 
     get periodLabel() {
-        return `${rangeFormatter.format(this.from)} – ${rangeFormatter.format(addDays(this.from, MODE_DAYS[this.mode] - 1))}`;
+        return `${rangeFormatter.format(this.from)} – ${rangeFormatter.format(addDays(this.from, this.dayCount - 1))}`;
     },
 
     get gridStyle() {
-        return `grid-template-columns: repeat(${MODE_DAYS[this.mode]}, minmax(0, 1fr));`;
+        return `grid-template-columns: repeat(${this.dayCount}, minmax(0, 1fr));`;
     },
 
     get isEmpty() {
         return this.tasks.length === 0 && this.events.length === 0;
+    },
+
+    get includesToday() {
+        return this.days.some((day) => day.isToday);
+    },
+
+    get overdueCount() {
+        return this.tasks.filter((task) => task.isOverdue).length;
+    },
+
+    /** Rows of task bars: packed together in compact mode, one task per row otherwise. */
+    get taskLanes() {
+        return this.compact ? packLanes(this.tasks) : this.tasks.map((task) => [task]);
+    },
+
+    get eventLanes() {
+        return this.compact ? packLanes(this.events) : this.events.map((event) => [event]);
     },
 
     onFiltersChanged(filters) {
@@ -67,12 +118,20 @@ export default (config, divisionId = '', scope = '') => ({
     },
 
     shift(direction) {
-        this.from = addDays(this.from, direction * MODE_DAYS[this.mode]);
+        this.from = addDays(this.from, direction * this.dayCount);
         this.load();
     },
 
     goToToday() {
         this.from = startOfWeek(new Date());
+        this.load();
+    },
+
+    /** Jump to the week that contains the picked date. */
+    goToDate(value) {
+        if (!value) return;
+
+        this.from = startOfWeek(parseDate(value));
         this.load();
     },
 
@@ -88,8 +147,13 @@ export default (config, divisionId = '', scope = '') => ({
 
             if (ticket !== this.ticket) return;
 
-            this.tasks = data.tasks;
-            this.events = data.events.map((event) => ({
+            const today = toDateString(new Date());
+
+            this.tasks = data.tasks.map((task) => this.withPlacement({
+                ...task,
+                isOverdue: task.status !== 'done' && task.end < today,
+            }));
+            this.events = data.events.map((event) => this.withPlacement({
                 ...event,
                 start: toDateString(new Date(event.start_at)),
                 end: toDateString(new Date(event.end_at ?? event.start_at)),
@@ -101,18 +165,28 @@ export default (config, divisionId = '', scope = '') => ({
         }
     },
 
-    /** Place an item on the grid, clipped to the visible period. */
-    placement(item) {
-        const days = MODE_DAYS[this.mode];
-        const dayIndex = (value) => Math.round((parseDate(value) - this.from) / 86400000);
-        const start = Math.max(0, dayIndex(item.start));
-        const end = Math.min(days - 1, dayIndex(item.end));
+    /** Work out once where an item sits on the grid, clipped to the visible period. */
+    withPlacement(item) {
+        const dayIndex = (value) => Math.round((parseDate(value) - this.from) / DAY_MS);
+        const rawStart = dayIndex(item.start);
+        const rawEnd = dayIndex(item.end);
+        const startIndex = Math.max(0, rawStart);
+        const endIndex = Math.min(this.dayCount - 1, rawEnd);
 
         return {
-            style: `grid-column: ${start + 1} / ${end + 2};`,
-            continuesBefore: dayIndex(item.start) < 0,
-            continuesAfter: dayIndex(item.end) > days - 1,
+            ...item,
+            startIndex,
+            endIndex,
+            continuesBefore: rawStart < 0,
+            continuesAfter: rawEnd > this.dayCount - 1,
+            gridStyle: `grid-column: ${startIndex + 1} / ${endIndex + 2}; grid-row: 1;`,
         };
+    },
+
+    taskTitle(task) {
+        const range = task.start === task.end ? this.formatDate(task.start) : `${this.formatDate(task.start)} – ${this.formatDate(task.end)}`;
+
+        return `${task.title} · ${task.division.name} · ${range} · ${task.status_label}${task.isOverdue ? ' · Terlambat' : ''}`;
     },
 
     openTask(task) {
