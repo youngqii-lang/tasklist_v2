@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Account;
+use App\Models\Role;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -31,8 +32,20 @@ class StoreAccountRequest extends FormRequest
             'role_id' => $this->user()->can('assignRole', Account::class)
                 ? ['required', 'integer', Rule::exists('roles', 'id')]
                 : ['exclude'],
-            'division_id' => ['required', 'integer', Rule::exists('divisions', 'id')],
+            'division_id' => [Rule::requiredIf(! $this->resultsInAdmin()), 'nullable', 'integer', Rule::exists('divisions', 'id')],
         ];
+    }
+
+    /**
+     * Whether the saved account will have the admin role. Admins work across divisions, so they need no division.
+     */
+    protected function resultsInAdmin(): bool
+    {
+        if (! $this->user()->can('assignRole', Account::class)) {
+            return false;
+        }
+
+        return Role::whereKey($this->integer('role_id'))->where('code_role', Role::ADMIN)->exists();
     }
 
     /**
@@ -48,6 +61,7 @@ class StoreAccountRequest extends FormRequest
             'username.unique' => 'Username sudah terdaftar, gunakan username lain.',
             'password.min' => 'Password minimal :min karakter.',
             'exists' => ':attribute yang dipilih tidak valid.',
+            'division_id.required' => 'Divisi wajib diisi, kecuali untuk role Admin.',
         ];
     }
 

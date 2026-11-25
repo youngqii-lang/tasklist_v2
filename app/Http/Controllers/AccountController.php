@@ -102,12 +102,13 @@ class AccountController extends Controller
     }
 
     /**
-     * Permanently delete the specified account.
+     * Permanently delete the specified account, unless task data still refers to it.
      */
     public function destroy(Account $account): RedirectResponse
     {
         Gate::authorize('delete', $account);
 
+        $account->ensureCanBeDeleted();
         $account->delete();
 
         return redirect()

@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Role;
+use App\Models\Task;
+use App\Models\TaskAssignment;
+use App\Models\TaskComment;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -345,19 +348,137 @@ class AccountManagementTest extends TestCase
             ->assertSee('Divisi Baru');
     }
 
-    public function test_manager_can_update_another_manager(): void
+    public function test_manager_can_update_staff_and_freelance_accounts(): void
     {
         $manager = Account::factory()->manager()->create();
-        $otherManager = Account::factory()->manager()->create();
 
-        $this->actingAs($manager)->put(route('accounts.update', $otherManager), [
-            'fullname' => 'Manager Diperbarui',
-            'username' => $otherManager->username,
-            'role_id' => $otherManager->role_id,
-            'division_id' => Division::factory()->create()->id,
+        foreach ([Account::factory()->employee()->create(), Account::factory()->freelance()->create()] as $account) {
+            $this->actingAs($manager)->put(route('accounts.update', $account), [
+                'fullname' => 'Staff Diperbarui',
+                'username' => $account->username,
+                'division_id' => $account->division_id,
+            ])->assertRedirect(route('accounts.index'));
+
+            $this->assertSame('Staff Diperbarui', $account->refresh()->fullname);
+        }
+    }
+
+    public function test_manager_cannot_open_or_update_admin_manager_or_supervisor_accounts(): void
+    {
+        $manager = Account::factory()->manager()->create();
+        $division = Division::factory()->create();
+
+        foreach (['admin', 'manager', 'supervisor'] as $role) {
+            $account = Account::factory()->{$role}()->create();
+            $originalPassword = $account->password;
+
+            $this->actingAs($manager)->get(route('accounts.edit', $account))->assertForbidden();
+
+            $this->actingAs($manager)->put(route('accounts.update', $account), [
+                'fullname' => 'Diambil Alih',
+                'username' => $account->username,
+                'password' => 'passwordbaru',
+                'division_id' => $division->id,
+            ])->assertForbidden();
+
+            $account->refresh();
+            $this->assertNotSame('Diambil Alih', $account->fullname, "Manager changed a {$role} account.");
+            $this->assertSame($originalPassword, $account->password, "Manager reset the password of a {$role} account.");
+        }
+    }
+
+    public function test_manager_only_sees_edit_and_delete_buttons_for_staff(): void
+    {
+        $manager = Account::factory()->manager()->create();
+        $employee = Account::factory()->employee()->create();
+        $admin = Account::factory()->admin()->create();
+
+        $this->actingAs($manager)->get(route('accounts.index'))
+            ->assertSee(route('accounts.edit', $employee))
+            ->assertSee('action="'.route('accounts.destroy', $employee).'"', false)
+            ->assertDontSee(route('accounts.edit', $admin))
+            ->assertDontSee('action="'.route('accounts.destroy', $admin).'"', false);
+    }
+
+    public function test_admin_can_update_any_account_including_its_role(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $manager = Account::factory()->manager()->create();
+        $supervisorRole = Role::where('code_role', Role::SUPERVISOR)->firstOrFail();
+
+        $this->actingAs($admin)->put(route('accounts.update', $manager), [
+            'fullname' => $manager->fullname,
+            'username' => $manager->username,
+            'role_id' => $supervisorRole->id,
+            'division_id' => $manager->division_id,
         ])->assertRedirect(route('accounts.index'));
 
-        $this->assertSame('Manager Diperbarui', $otherManager->refresh()->fullname);
+        $this->assertSame(Role::SUPERVISOR, $manager->refresh()->role->code_role);
+    }
+
+    public function test_sole_active_admin_cannot_remove_its_admin_role(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        Account::factory()->admin()->inactive()->create();
+        $employeeRole = Role::where('code_role', Role::EMPLOYEE)->firstOrFail();
+
+        $this->actingAs($admin)->put(route('accounts.update', $admin), [
+            'fullname' => $admin->fullname,
+            'username' => $admin->username,
+            'role_id' => $employeeRole->id,
+            'division_id' => Division::factory()->create()->id,
+        ])->assertSessionHasErrors(['role_id' => 'Role tidak dapat diubah karena akun ini satu-satunya Admin aktif.']);
+
+        $this->assertTrue($admin->refresh()->isAdmin());
+    }
+
+    public function test_admin_role_can_be_removed_while_another_active_admin_remains(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $otherAdmin = Account::factory()->admin()->create();
+        $employeeRole = Role::where('code_role', Role::EMPLOYEE)->firstOrFail();
+
+        $this->actingAs($admin)->put(route('accounts.update', $otherAdmin), [
+            'fullname' => $otherAdmin->fullname,
+            'username' => $otherAdmin->username,
+            'role_id' => $employeeRole->id,
+            'division_id' => Division::factory()->create()->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(Role::EMPLOYEE, $otherAdmin->refresh()->role->code_role);
+    }
+
+    public function test_admin_accounts_need_no_division_but_other_roles_do(): void
+    {
+        $admin = Account::factory()->admin()->withoutDivision()->create();
+        $adminRole = Role::where('code_role', Role::ADMIN)->firstOrFail();
+        $employeeRole = Role::where('code_role', Role::EMPLOYEE)->firstOrFail();
+
+        $this->actingAs($admin)->put(route('accounts.update', $admin), [
+            'fullname' => 'Admin Baru',
+            'username' => $admin->username,
+            'role_id' => $adminRole->id,
+            'division_id' => '',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Admin Baru', $admin->refresh()->fullname);
+        $this->assertNull($admin->division_id);
+
+        $this->actingAs($admin)->post(route('accounts.store'), [
+            'fullname' => 'Admin Kedua',
+            'username' => 'adminkedua',
+            'password' => 'password123',
+            'role_id' => $adminRole->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('accounts', ['username' => 'adminkedua', 'division_id' => null]);
+
+        $this->actingAs($admin)->post(route('accounts.store'), [
+            'fullname' => 'Staff Tanpa Divisi',
+            'username' => 'stafftanpadivisi',
+            'password' => 'password123',
+            'role_id' => $employeeRole->id,
+        ])->assertSessionHasErrors(['division_id' => 'Divisi wajib diisi, kecuali untuk role Admin.']);
     }
 
     public function test_update_keeps_password_when_left_empty(): void
@@ -434,19 +555,60 @@ class AccountManagementTest extends TestCase
             ->assertSee('Apakah Anda yakin ingin menghapus akun');
     }
 
-    public function test_manager_can_hard_delete_employee_and_manager_accounts(): void
+    public function test_manager_can_hard_delete_staff_but_not_other_roles(): void
     {
         $manager = Account::factory()->manager()->create();
         $employee = Account::factory()->employee()->create(['fullname' => 'Akun Dihapus']);
-        $otherManager = Account::factory()->manager()->create();
+        $freelancer = Account::factory()->freelance()->create();
 
         $this->actingAs($manager)->delete(route('accounts.destroy', $employee))->assertRedirect(route('accounts.index'));
-        $this->actingAs($manager)->delete(route('accounts.destroy', $otherManager))->assertRedirect(route('accounts.index'));
+        $this->actingAs($manager)->delete(route('accounts.destroy', $freelancer))->assertRedirect(route('accounts.index'));
 
         $this->assertDatabaseMissing('accounts', ['id' => $employee->id]);
-        $this->assertDatabaseMissing('accounts', ['id' => $otherManager->id]);
-
+        $this->assertDatabaseMissing('accounts', ['id' => $freelancer->id]);
         $this->actingAs($manager)->get(route('accounts.index'))->assertDontSee('Akun Dihapus');
+
+        foreach (['admin', 'manager', 'supervisor'] as $role) {
+            $account = Account::factory()->{$role}()->create();
+
+            $this->actingAs($manager)->delete(route('accounts.destroy', $account))->assertForbidden();
+            $this->assertDatabaseHas('accounts', ['id' => $account->id]);
+        }
+    }
+
+    public function test_admin_can_delete_another_admin_but_not_itself(): void
+    {
+        $admin = Account::factory()->admin()->create();
+        $otherAdmin = Account::factory()->admin()->create();
+
+        $this->actingAs($admin)->delete(route('accounts.destroy', $otherAdmin))->assertRedirect(route('accounts.index'));
+        $this->actingAs($admin)->delete(route('accounts.destroy', $admin))->assertForbidden();
+
+        $this->assertDatabaseMissing('accounts', ['id' => $otherAdmin->id]);
+        $this->assertDatabaseHas('accounts', ['id' => $admin->id]);
+    }
+
+    public function test_account_with_task_history_is_not_deleted_and_shows_the_reason(): void
+    {
+        $manager = Account::factory()->manager()->create();
+        $pic = Account::factory()->employee()->create();
+        $commenter = Account::factory()->employee()->create();
+        TaskAssignment::factory()->for(Task::factory())->for($pic, 'account')->create();
+        TaskComment::factory()->for(Task::factory())->for($commenter, 'author')->create();
+
+        foreach ([$pic, $commenter] as $account) {
+            $this->actingAs($manager)
+                ->from(route('accounts.index'))
+                ->delete(route('accounts.destroy', $account))
+                ->assertRedirect(route('accounts.index'))
+                ->assertSessionHas('error', 'Akun ini tidak dapat dihapus karena masih memiliki riwayat tugas, komentar, atau agenda.');
+
+            $this->assertDatabaseHas('accounts', ['id' => $account->id]);
+        }
+
+        $this->actingAs($manager)
+            ->deleteJson(route('accounts.destroy', $pic))
+            ->assertConflict();
     }
 
     public function test_manager_cannot_delete_own_account(): void
