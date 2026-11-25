@@ -15,8 +15,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Status workflow following the TASK-17 transition matrix.
  *
- * A PIC can bring a task at most to Ready Review; reviewing, revising and finishing stay with the
- * admin, manager or supervisor who manages the task.
+ * A PIC can move their own task from Back Log through To Do and On Process up to Ready Review; reviewing,
+ * revising and finishing stay with the admin, manager or supervisor who manages the task.
  */
 class TaskWorkflowService
 {
@@ -36,7 +36,7 @@ class TaskWorkflowService
      * @var array<string, array<string, string>>
      */
     protected const array TRANSITIONS = [
-        Task::STATUS_BACKLOG => [Task::STATUS_TODO => self::BY_MANAGER],
+        Task::STATUS_BACKLOG => [Task::STATUS_TODO => self::BY_PIC_OR_MANAGER],
         Task::STATUS_TODO => [Task::STATUS_IN_PROGRESS => self::BY_PIC_OR_MANAGER],
         Task::STATUS_IN_PROGRESS => [Task::STATUS_READY_REVIEW => self::BY_PIC_OR_MANAGER, Task::STATUS_DONE => self::BY_MANAGER],
         Task::STATUS_READY_REVIEW => [Task::STATUS_ON_REVIEW => self::BY_MANAGER],

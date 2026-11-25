@@ -123,11 +123,15 @@ class TaskRoleManagementTest extends TestCase
             ->getJson(route('api.tasks.show', $this->task))
             ->assertJsonPath('data.abilities.review', false);
 
-        $backlogTask = Task::factory()->for($this->division)->create(['status' => Task::STATUS_BACKLOG]);
-        TaskAssignment::factory()->for($backlogTask)->for($this->pic, 'account')->create();
+        $this->actingAs($this->pic)
+            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_DONE, 'version' => $this->task->version])
+            ->assertForbidden();
+
+        $readyTask = Task::factory()->for($this->division)->create(['status' => Task::STATUS_READY_REVIEW]);
+        TaskAssignment::factory()->for($readyTask)->for($this->pic, 'account')->create();
 
         $this->actingAs($this->pic)
-            ->patchJson(route('api.tasks.status.update', $backlogTask), ['status' => Task::STATUS_TODO, 'version' => 1])
+            ->patchJson(route('api.tasks.status.update', $readyTask), ['status' => Task::STATUS_ON_REVIEW, 'version' => 1])
             ->assertForbidden();
     }
 
