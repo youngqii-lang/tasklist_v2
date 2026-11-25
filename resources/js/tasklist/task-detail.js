@@ -1,15 +1,6 @@
 import Alpine from 'alpinejs';
 import { http } from '../http';
-import { formatting } from './format';
-
-const TRANSITION_LABELS = {
-    todo: 'Siap Dikerjakan (To Do)',
-    in_progress: 'Mulai Kerjakan',
-    ready_review: 'Kirim untuk Review',
-    on_review: 'Mulai Review',
-    done: 'Selesaikan Tugas',
-    backlog: 'Kembalikan ke Back Log',
-};
+import { formatting, transitionLabel } from './format';
 
 const FIELD_LABELS = {
     title: 'Judul',
@@ -91,9 +82,7 @@ export default (config) => ({
     },
 
     transitionLabel(status) {
-        if (status === 'done' && this.task?.status === 'in_progress') return 'Selesaikan (tanpa QA)';
-
-        return TRANSITION_LABELS[status] ?? this.statusLabel(status);
+        return transitionLabel(this.task?.status, status);
     },
 
     show(id) {

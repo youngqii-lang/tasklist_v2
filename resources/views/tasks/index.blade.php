@@ -5,6 +5,11 @@
         x-data="tasklist(@js($config))"
         @tasks-changed.window="refresh()"
         @focus-task-on-board.window="focusTaskOnBoard($event.detail)"
+        @pointermove.window="onWindowPointerMove($event)"
+        @pointerup.window="onWindowPointerUp($event)"
+        @pointercancel.window="cancelDrag()"
+        @blur.window="cancelDrag()"
+        @keydown.escape.window="cancelDrag()"
         class="mx-auto max-w-7xl"
     >
         <div class="flex flex-wrap items-end justify-between gap-4">

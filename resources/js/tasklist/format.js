@@ -110,3 +110,21 @@ export const formatting = {
     formatFileSize,
     picNames,
 };
+
+/** Action labels for moving a task to a status, shared by the Board move menu and the detail panel. */
+export const TRANSITION_LABELS = {
+    todo: 'Siap Dikerjakan (To Do)',
+    in_progress: 'Mulai Kerjakan',
+    ready_review: 'Kirim untuk Review',
+    on_review: 'Mulai Review',
+    done: 'Selesaikan Tugas',
+    backlog: 'Kembalikan ke Back Log',
+};
+
+export function transitionLabel(fromStatus, toStatus) {
+    if (toStatus === 'done' && fromStatus === 'in_progress') return 'Selesaikan (tanpa QA)';
+    if (toStatus === 'done' && fromStatus === 'on_review') return 'Approve (Done)';
+    if (toStatus === 'backlog' && fromStatus === 'on_review') return 'Minta Revisi';
+
+    return TRANSITION_LABELS[toStatus] ?? toStatus;
+}

@@ -1,5 +1,6 @@
 import Alpine from 'alpinejs';
 import { http } from '../http';
+import boardDrag from './board-drag';
 import { formatting } from './format';
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
@@ -30,6 +31,7 @@ const TABLE_PAGE_SIZE = 15;
  */
 export default (config) => ({
     ...formatting,
+    ...boardDrag,
     config,
     view: 'board',
     filters: { ...DEFAULT_FILTERS },
@@ -42,12 +44,12 @@ export default (config) => ({
     board: { tasks: [], counts: {}, total: 0, loading: true, error: null },
     table: { tasks: [], meta: null, loading: true, error: null },
     summary: { data: null, loading: true, error: null },
-    drag: { task: null, over: null },
     movingIds: {},
     revision: { open: false, task: null, note: '', error: null, saving: false },
     sequence: { board: 0, table: 0, summary: 0 },
 
     init() {
+        this.initBoardDrag();
         this.readUrl();
         this.refresh();
 
@@ -354,59 +356,6 @@ export default (config) => ({
 
     openEditForm(task) {
         this.$dispatch('open-task-form', { task });
-    },
-
-    /* Drag-and-drop on the Board ------------------------------------------------------------ */
-
-    canDrag(task) {
-        return task.abilities.transitions.length > 0 && !this.movingIds[task.id];
-    },
-
-    onDragStart(event, task) {
-        this.drag.task = task;
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', String(task.id));
-    },
-
-    onDragOver(event, status) {
-        if (!this.drag.task || this.drag.task.status === status) return;
-
-        event.preventDefault();
-        this.drag.over = status;
-    },
-
-    onDragLeave(status) {
-        if (this.drag.over === status) this.drag.over = null;
-    },
-
-    onDragEnd() {
-        this.drag.task = null;
-        this.drag.over = null;
-    },
-
-    isDropAllowed(status) {
-        return Boolean(this.drag.task?.abilities.transitions.includes(status));
-    },
-
-    onDrop(status) {
-        const task = this.drag.task;
-        this.onDragEnd();
-
-        if (!task || task.status === status) return;
-
-        if (!task.abilities.transitions.includes(status)) {
-            Alpine.store('toast').error(this.rejectionReason(task, status));
-
-            return;
-        }
-
-        if (task.status === 'on_review' && status === 'backlog') {
-            this.revision = { open: true, task, note: '', error: null, saving: false };
-
-            return;
-        }
-
-        this.moveTask(task, status);
     },
 
     /** Explain why a drop is refused, mirroring the workflow rules of the API. */

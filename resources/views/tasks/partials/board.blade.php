@@ -11,6 +11,12 @@
         Menampilkan <span x-text="board.tasks.length"></span> dari <span x-text="board.total"></span> tugas. Gunakan filter atau Table View untuk melihat semuanya.
     </p>
 
+    <p x-show="!board.error && board.total > 0" class="mb-3 flex items-center gap-2 text-xs text-slate-500">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 shrink-0 text-slate-400"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
+        <span class="hidden sm:inline">Seret kartu bertanda titik ke kolom yang menyala hijau, atau gunakan tombol <strong class="font-semibold">Pindahkan</strong> pada kartu. Tekan Esc untuk membatalkan.</span>
+        <span class="sm:hidden">Tekan lama kartu lalu geser ke kolom yang menyala hijau, atau gunakan tombol <strong class="font-semibold">Pindahkan</strong>.</span>
+    </p>
+
     <div
         x-show="!board.error && (board.loading || board.total > 0)"
         class="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-3"
@@ -18,25 +24,40 @@
     >
         <template x-for="status in config.statuses" :key="status.value">
             <div
-                class="flex min-w-0 flex-col rounded-2xl bg-burgundy-50/60 ring-1 ring-burgundy-100 transition"
+                :data-board-column="status.value"
+                class="relative flex min-w-0 flex-col rounded-2xl ring-1 transition duration-150"
                 :class="{
-                    'ring-2 ring-emerald-400 bg-emerald-50/60': drag.over === status.value && isDropAllowed(status.value),
-                    'ring-2 ring-red-300 bg-red-50/60': drag.over === status.value && !isDropAllowed(status.value),
-                    'opacity-60': drag.task && drag.task.status !== status.value && !isDropAllowed(status.value),
+                    'bg-burgundy-50/60 ring-burgundy-100': !drag.active || columnDropState(status.value) === 'origin',
+                    'bg-emerald-50/70 ring-2 ring-emerald-300': columnDropState(status.value) === 'allowed' && drag.over !== status.value,
+                    'bg-emerald-100 ring-4 ring-emerald-500 scale-[1.01] shadow-lg': columnDropState(status.value) === 'allowed' && drag.over === status.value,
+                    'bg-slate-100/70 ring-slate-200 opacity-50': columnDropState(status.value) === 'refused' && drag.over !== status.value,
+                    'bg-red-50 ring-2 ring-red-300 opacity-80': columnDropState(status.value) === 'refused' && drag.over === status.value,
                 }"
-                @dragover="onDragOver($event, status.value)"
-                @dragleave.self="onDragLeave(status.value)"
-                @drop.prevent="onDrop(status.value)"
             >
                 <header class="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
                     <h3 class="flex items-center gap-2 text-sm font-semibold text-slate-800">
                         <span class="size-2.5 rounded-full" :class="statusDot(status.value)"></span>
                         <span x-text="status.label"></span>
                     </h3>
-                    <span class="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-burgundy-100" x-text="board.counts[status.value] ?? 0" :aria-label="`${board.counts[status.value] ?? 0} tugas`"></span>
+                    <span x-show="!drag.active" class="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-burgundy-100" x-text="board.counts[status.value] ?? 0" :aria-label="`${board.counts[status.value] ?? 0} tugas`"></span>
+                    <span x-show="columnDropState(status.value) === 'origin'" x-cloak class="text-[11px] font-medium text-slate-500">Posisi saat ini</span>
+                    <span x-show="columnDropState(status.value) === 'refused'" x-cloak class="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+                        Tidak diizinkan
+                    </span>
                 </header>
 
                 <ul class="flex min-h-24 flex-1 flex-col gap-2 px-3 pb-3">
+                    <li
+                        x-show="columnDropState(status.value) === 'allowed'"
+                        x-cloak
+                        class="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed px-3 py-4 text-center text-sm font-semibold transition"
+                        :class="drag.over === status.value ? 'border-emerald-600 bg-white text-emerald-800' : 'border-emerald-400 text-emerald-700'"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 shrink-0"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                        <span x-text="'Lepas di sini: ' + dropHint(status.value)"></span>
+                    </li>
+
                     <template x-if="board.loading && board.tasks.length === 0">
                         <li class="h-24 animate-pulse rounded-xl bg-white/70"></li>
                     </template>
@@ -44,19 +65,32 @@
                     <template x-for="task in column(status.value)" :key="task.id">
                         <li
                             :id="'task-card-' + task.id"
-                            :draggable="canDrag(task)"
-                            @dragstart="onDragStart($event, task)"
-                            @dragend="onDragEnd()"
-                            :class="{ 'cursor-grab active:cursor-grabbing': canDrag(task), 'opacity-50': movingIds[task.id] || drag.task?.id === task.id }"
+                            class="relative"
+                            :class="{
+                                'opacity-40': drag.task?.id === task.id,
+                                'opacity-60': movingIds[task.id],
+                            }"
                         >
-                            <button
-                                type="button"
-                                @click="openTask(task.id)"
-                                class="block w-full rounded-xl bg-white p-3 text-left shadow-sm transition hover:ring-burgundy-300 focus:outline-none focus:ring-2 focus:ring-burgundy-400"
-                                :class="highlightId === task.id ? 'ring-2 ring-amber-400 bg-amber-50' : 'ring-1 ring-burgundy-100'"
+                            <div
+                                role="button"
+                                tabindex="0"
+                                @pointerdown="onCardPointerDown($event, task)"
+                                @click="onCardClick(task)"
+                                @keydown.enter.prevent="openTask(task.id)"
+                                @keydown.space.prevent="openTask(task.id)"
+                                @contextmenu="(pendingDrag || drag.active) && $event.preventDefault()"
+                                :aria-label="task.title"
+                                :title="canDrag(task) ? 'Klik untuk detail, seret untuk memindahkan status' : 'Klik untuk melihat detail'"
+                                class="block w-full rounded-xl bg-white p-3 text-left shadow-sm transition select-none [-webkit-touch-callout:none] hover:ring-burgundy-300 focus:outline-none focus:ring-2 focus:ring-burgundy-400"
+                                :class="[
+                                    highlightId === task.id ? 'ring-2 ring-amber-400 bg-amber-50' : 'ring-1 ring-burgundy-100',
+                                    canDrag(task) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                                    drag.task?.id === task.id && 'border-2 border-dashed border-burgundy-300 shadow-none',
+                                ]"
                             >
-                                <div class="flex items-start justify-between gap-2">
-                                    <p class="line-clamp-2 text-sm font-semibold text-slate-900" x-text="task.title"></p>
+                                <div class="flex items-start gap-1.5">
+                                    <svg x-show="canDrag(task)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mt-0.5 size-4 shrink-0 text-slate-300" aria-hidden="true"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
+                                    <p class="line-clamp-2 flex-1 text-sm font-semibold text-slate-900" x-text="task.title"></p>
                                     <span class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
                                 </div>
                                 <p class="mt-1 truncate text-xs text-slate-500" x-text="task.division?.name"></p>
@@ -82,7 +116,55 @@
                                         <span x-show="task.is_overdue">· Terlambat</span>
                                     </span>
                                 </div>
-                            </button>
+
+                                <div x-show="canDrag(task) || movingIds[task.id]" class="mt-2 flex justify-end border-t border-burgundy-50 pt-2" data-no-drag>
+                                    <span x-show="movingIds[task.id]" class="flex items-center gap-1.5 text-xs text-slate-500">
+                                        <svg class="size-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" /><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" /></svg>
+                                        Menyimpan…
+                                    </span>
+                                    <button
+                                        x-show="!movingIds[task.id]"
+                                        type="button"
+                                        @click.stop="toggleMoveMenu(task)"
+                                        @keydown.enter.stop
+                                        @keydown.space.stop
+                                        :aria-expanded="moveMenuTaskId === task.id"
+                                        aria-haspopup="menu"
+                                        class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-burgundy-700 ring-1 ring-burgundy-200 hover:bg-burgundy-50 focus:outline-none focus:ring-2 focus:ring-burgundy-400"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                                        Pindahkan
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div
+                                x-show="moveMenuTaskId === task.id"
+                                x-cloak
+                                x-transition.origin.top.right
+                                @click.outside="moveMenuTaskId = null"
+                                @keydown.escape.stop="moveMenuTaskId = null"
+                                class="absolute right-2 z-20 mt-1 w-60 overflow-hidden rounded-xl bg-white py-1 shadow-xl ring-1 ring-burgundy-100"
+                                role="menu"
+                                :aria-label="'Pindahkan ' + task.title"
+                                data-no-drag
+                            >
+                                <p class="px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">Pindahkan ke</p>
+                                <template x-for="option in moveOptions(task)" :key="option.status">
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        @click="chooseMove(task, option.status)"
+                                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-burgundy-50 focus:bg-burgundy-50 focus:outline-none"
+                                    >
+                                        <span class="size-2 shrink-0 rounded-full" :class="statusDot(option.status)"></span>
+                                        <span class="flex-1">
+                                            <span class="block font-medium text-slate-800" x-text="option.label"></span>
+                                            <span class="block text-xs text-slate-500" x-text="'→ ' + option.target"></span>
+                                        </span>
+                                    </button>
+                                </template>
+                            </div>
                         </li>
                     </template>
                 </ul>
@@ -90,5 +172,24 @@
         </template>
     </div>
 
-    <p class="mt-1 hidden text-xs text-slate-400 lg:block">Seret kartu ke kolom lain untuk mengubah status sesuai kewenangan Anda. Di layar sentuh, ubah status melalui detail tugas.</p>
+    {{-- The card that follows the pointer while dragging --}}
+    <div
+        x-show="drag.active"
+        x-cloak
+        class="pointer-events-none fixed top-0 left-0 z-[70]"
+        :style="`width: ${drag.width}px; transform: translate(${drag.x - drag.offsetX}px, ${drag.y - drag.offsetY}px) rotate(2deg);`"
+        aria-hidden="true"
+    >
+        <div
+            class="rounded-xl bg-white p-3 shadow-2xl ring-2"
+            :class="!drag.over || drag.over === drag.task?.status ? 'ring-burgundy-300' : (isDropAllowed(drag.over) ? 'ring-emerald-500' : 'ring-red-400')"
+        >
+            <p class="line-clamp-2 text-sm font-semibold text-slate-900" x-text="drag.task?.title"></p>
+            <p class="mt-2 text-xs font-semibold"
+               :class="!drag.over || drag.over === drag.task?.status ? 'text-slate-500' : (isDropAllowed(drag.over) ? 'text-emerald-700' : 'text-red-600')"
+               x-text="!drag.over || drag.over === drag.task?.status
+                   ? (drag.task?.status_label + ' · geser ke kolom hijau')
+                   : (isDropAllowed(drag.over) ? '→ ' + statusLabel(drag.over) : 'Tidak diizinkan ke ' + statusLabel(drag.over))"></p>
+        </div>
+    </div>
 </section>
