@@ -201,12 +201,12 @@ class TaskStatusWorkflowTest extends TestCase
     {
         $task = $this->task(Task::STATUS_TODO);
         $otherStaff = Account::factory()->employee()->for($this->division)->create();
-        $otherManager = Account::factory()->manager()->create();
+        $otherSupervisor = Account::factory()->supervisor()->create();
 
         $this->moveTo($otherStaff, $task, Task::STATUS_IN_PROGRESS)
             ->assertForbidden()
             ->assertJsonPath('message', 'Hanya PIC tugas atau Admin/Manajer/Supervisor yang berwenang yang dapat melakukan perpindahan status ini.');
-        $this->moveTo($otherManager, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
+        $this->moveTo($otherSupervisor, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
 
         $this->assertSame(Task::STATUS_TODO, $task->fresh()->status);
     }

@@ -98,7 +98,7 @@ class TaskCommentTest extends TestCase
     {
         $readOnly = [
             Account::factory()->employee()->for($this->division)->create(),
-            Account::factory()->manager()->create(),
+            Account::factory()->supervisor()->create(),
         ];
 
         foreach ($readOnly as $account) {

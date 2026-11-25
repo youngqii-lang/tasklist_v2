@@ -32,6 +32,7 @@ class ListTasksRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'scope' => ['nullable', 'string', Rule::in(Task::SCOPES)],
             'search' => ['nullable', 'string', 'max:150'],
             'division_id' => ['nullable', 'integer', Rule::exists('divisions', 'id')],
             'pic_id' => ['nullable', 'integer', Rule::exists('accounts', 'id')],
@@ -80,6 +81,7 @@ class ListTasksRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'scope' => 'Cakupan tugas',
             'search' => 'Pencarian',
             'division_id' => 'Divisi',
             'pic_id' => 'PIC',

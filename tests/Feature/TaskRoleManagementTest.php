@@ -145,21 +145,31 @@ class TaskRoleManagementTest extends TestCase
         }
     }
 
-    public function test_manager_cannot_delete_tasks_of_another_division(): void
+    public function test_supervisor_cannot_delete_tasks_of_another_division(): void
     {
-        $this->deleteTask(Account::factory()->manager()->create())->assertForbidden();
+        $this->deleteTask(Account::factory()->supervisor()->create())->assertForbidden();
 
         $this->assertNotSoftDeleted('tasks', ['id' => $this->task->id]);
     }
 
-    public function test_pic_can_delete_their_own_task_but_not_others(): void
+    public function test_manager_can_delete_tasks_of_any_division(): void
     {
-        $otherTask = Task::factory()->for($this->division)->create();
+        $manager = Account::factory()->manager()->create();
 
-        $this->deleteTask($this->pic, $otherTask)->assertForbidden();
-        $this->deleteTask($this->pic)->assertOk();
+        $this->deleteTask($manager)->assertOk();
 
-        $this->assertSoftDeleted('tasks', ['id' => $this->task->id, 'deleted_by' => $this->pic->id]);
+        $this->assertSoftDeleted('tasks', ['id' => $this->task->id, 'deleted_by' => $manager->id]);
+    }
+
+    public function test_staff_and_freelance_cannot_delete_a_task_card_even_as_pic(): void
+    {
+        $freelancer = Account::factory()->freelance()->for($this->division)->create();
+        TaskAssignment::factory()->for($this->task)->for($freelancer, 'account')->create();
+
+        $this->deleteTask($this->pic)->assertForbidden();
+        $this->deleteTask($freelancer)->assertForbidden();
+
+        $this->assertNotSoftDeleted('tasks', ['id' => $this->task->id]);
     }
 
     public function test_deleted_task_disappears_from_the_list_and_keeps_its_history(): void
@@ -190,7 +200,10 @@ class TaskRoleManagementTest extends TestCase
 
     public function test_task_exposes_the_delete_ability(): void
     {
-        $this->actingAs($this->pic)->getJson(route('api.tasks.show', $this->task))->assertJsonPath('data.abilities.delete', true);
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
+
+        $this->actingAs($supervisor)->getJson(route('api.tasks.show', $this->task))->assertJsonPath('data.abilities.delete', true);
+        $this->actingAs($this->pic)->getJson(route('api.tasks.show', $this->task))->assertJsonPath('data.abilities.delete', false);
         $this->actingAs(Account::factory()->employee()->create())
             ->getJson(route('api.tasks.show', $this->task))
             ->assertJsonPath('data.abilities.delete', false);

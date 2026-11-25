@@ -27,6 +27,7 @@ class ShowCalendarRequest extends FormRequest
         return [
             'month' => ['nullable', 'date_format:Y-m'],
             'division_id' => ['nullable', 'integer', Rule::exists('divisions', 'id')],
+            'scope' => ['nullable', 'string', Rule::in(Task::SCOPES)],
         ];
     }
 
@@ -41,6 +42,7 @@ class ShowCalendarRequest extends FormRequest
             'date_format' => ':attribute harus berformat YYYY-MM.',
             'integer' => ':attribute tidak valid.',
             'exists' => ':attribute yang dipilih tidak valid.',
+            'in' => ':attribute yang dipilih tidak valid.',
         ];
     }
 
@@ -54,6 +56,7 @@ class ShowCalendarRequest extends FormRequest
         return [
             'month' => 'Bulan',
             'division_id' => 'Divisi',
+            'scope' => 'Cakupan tugas',
         ];
     }
 }

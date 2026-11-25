@@ -87,13 +87,13 @@ class TaskDetailTest extends TestCase
             ->assertJsonPath('data.activities.1.id', $older->id);
     }
 
-    public function test_manager_can_open_tasks_of_another_division_read_only(): void
+    public function test_supervisor_can_open_tasks_of_another_division_read_only(): void
     {
-        $manager = Account::factory()->manager()->for($this->division)->create();
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
         $otherTask = Task::factory()->create();
 
-        $this->actingAs($manager)->getJson(route('api.tasks.show', $this->task))->assertJsonPath('data.abilities.update', true);
-        $this->actingAs($manager)
+        $this->actingAs($supervisor)->getJson(route('api.tasks.show', $this->task))->assertJsonPath('data.abilities.update', true);
+        $this->actingAs($supervisor)
             ->getJson(route('api.tasks.show', $otherTask))
             ->assertOk()
             ->assertJsonPath('data.abilities.update', false)

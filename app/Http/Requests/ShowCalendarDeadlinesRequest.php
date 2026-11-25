@@ -27,6 +27,7 @@ class ShowCalendarDeadlinesRequest extends FormRequest
         return [
             'date' => ['required', 'date_format:Y-m-d'],
             'division_id' => ['nullable', 'integer', Rule::exists('divisions', 'id')],
+            'scope' => ['nullable', 'string', Rule::in(Task::SCOPES)],
         ];
     }
 
@@ -42,6 +43,7 @@ class ShowCalendarDeadlinesRequest extends FormRequest
             'date_format' => ':attribute harus berformat YYYY-MM-DD.',
             'integer' => ':attribute tidak valid.',
             'exists' => ':attribute yang dipilih tidak valid.',
+            'in' => ':attribute yang dipilih tidak valid.',
         ];
     }
 
@@ -55,6 +57,7 @@ class ShowCalendarDeadlinesRequest extends FormRequest
         return [
             'date' => 'Tanggal',
             'division_id' => 'Divisi',
+            'scope' => 'Cakupan tugas',
         ];
     }
 }

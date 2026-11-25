@@ -66,18 +66,19 @@ class TasklistPageTest extends TestCase
             ->assertViewHas('config', fn (array $config) => $config['can_create'] === false);
     }
 
-    public function test_pic_filter_lists_only_active_staff_and_freelancers_of_every_division(): void
+    public function test_pic_filter_lists_active_non_admin_accounts_of_every_division(): void
     {
         $staff = Account::factory()->employee()->for($this->division)->create();
         $freelancer = Account::factory()->freelance()->for(Division::factory())->create();
-        Account::factory()->employee()->inactive()->for($this->division)->create();
         $manager = Account::factory()->manager()->for($this->division)->create();
+        Account::factory()->employee()->inactive()->for($this->division)->create();
+        $admin = Account::factory()->admin()->for($this->division)->create();
 
         $this->actingAs($staff)->get(route('tasks.index'))
             ->assertOk()
             ->assertViewHas('config', fn (array $config) => collect($config['pics'])->pluck('id')->sort()->values()->all()
-                === collect([$staff->id, $freelancer->id])->sort()->values()->all()
-                && ! collect($config['pics'])->contains('id', $manager->id));
+                === collect([$staff->id, $freelancer->id, $manager->id])->sort()->values()->all()
+                && ! collect($config['pics'])->contains('id', $admin->id));
     }
 
     public function test_inactive_account_cannot_open_the_tasklist(): void
@@ -97,16 +98,16 @@ class TasklistPageTest extends TestCase
     public function test_task_abilities_tell_whether_the_user_manages_the_task(): void
     {
         $task = Task::factory()->for($this->division)->create();
-        $manager = Account::factory()->manager()->for($this->division)->create();
-        $otherManager = Account::factory()->manager()->for(Division::factory())->create();
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
+        $otherSupervisor = Account::factory()->supervisor()->for(Division::factory())->create();
         $pic = Account::factory()->employee()->for($this->division)->create();
         TaskAssignment::factory()->for($task)->for($pic, 'account')->create();
 
-        $this->actingAs($manager)->getJson(route('api.tasks.show', $task))
+        $this->actingAs($supervisor)->getJson(route('api.tasks.show', $task))
             ->assertOk()
             ->assertJsonPath('data.abilities.manage', true);
 
-        $this->actingAs($otherManager)->getJson(route('api.tasks.show', $task))
+        $this->actingAs($otherSupervisor)->getJson(route('api.tasks.show', $task))
             ->assertOk()
             ->assertJsonPath('data.abilities.manage', false)
             ->assertJsonPath('data.abilities.update', false);
