@@ -39,9 +39,9 @@ class AccountPolicy
     }
 
     /**
-     * Admins may choose the role of a new account; managers always create employees.
+     * Only admins may choose or change an account's role. Accounts created by others start as employees.
      */
-    public function assignRoleOnCreate(Account $user): bool
+    public function assignRole(Account $user): bool
     {
         return $user->isAdmin();
     }

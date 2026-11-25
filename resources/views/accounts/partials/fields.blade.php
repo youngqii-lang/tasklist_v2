@@ -86,6 +86,12 @@
             <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
         @enderror
     </div>
+@elseif ($account)
+    <div>
+        <p class="mb-1.5 text-sm font-medium text-slate-700">Role</p>
+        <p class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200">{{ $account->role?->name ?? '-' }}</p>
+        <p class="mt-1.5 text-xs text-slate-500">Role hanya dapat diubah oleh Admin.</p>
+    </div>
 @endif
 
 <div>

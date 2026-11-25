@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Account;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 
@@ -19,6 +20,7 @@ class UpdateAccountRequest extends StoreAccountRequest
      * Get the validation rules that apply to the request.
      *
      * The password is optional: leaving it empty keeps the current password.
+     * The role is only accepted from admins; for anybody else it is left untouched.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -34,7 +36,9 @@ class UpdateAccountRequest extends StoreAccountRequest
                 Rule::unique('accounts', 'username')->ignore($this->route('account')),
             ],
             'password' => ['nullable', 'string', 'min:8', 'max:255'],
-            'role_id' => ['required', 'integer', Rule::exists('roles', 'id')],
+            'role_id' => $this->user()->can('assignRole', Account::class)
+                ? ['required', 'integer', Rule::exists('roles', 'id')]
+                : ['exclude'],
             'division_id' => ['required', 'integer', Rule::exists('divisions', 'id')],
         ];
     }

@@ -316,18 +316,18 @@ class AccountManagementTest extends TestCase
         $this->assertDatabaseMissing('accounts', ['username' => $username]);
     }
 
-    public function test_manager_can_update_account_fields_including_role_and_password(): void
+    public function test_manager_can_update_account_fields_but_not_its_role(): void
     {
         $manager = Account::factory()->manager()->create();
         $account = Account::factory()->employee()->create();
         $newDivision = Division::factory()->create(['name' => 'Divisi Baru']);
-        $managerRole = Role::where('code_role', Role::MANAGER)->firstOrFail();
+        $adminRole = Role::where('code_role', Role::ADMIN)->firstOrFail();
 
         $this->actingAs($manager)->put(route('accounts.update', $account), [
             'fullname' => 'Nama Baru',
             'username' => 'namabaru',
             'password' => 'passwordbaru',
-            'role_id' => $managerRole->id,
+            'role_id' => $adminRole->id,
             'division_id' => $newDivision->id,
         ])->assertRedirect(route('accounts.index'))->assertSessionHas('status');
 
@@ -335,7 +335,7 @@ class AccountManagementTest extends TestCase
 
         $this->assertSame('Nama Baru', $account->fullname);
         $this->assertSame('namabaru', $account->username);
-        $this->assertTrue($account->isManager());
+        $this->assertSame(Role::EMPLOYEE, $account->role->code_role);
         $this->assertSame($newDivision->id, $account->division_id);
         $this->assertTrue(Hash::check('passwordbaru', $account->password));
 
@@ -384,7 +384,29 @@ class AccountManagementTest extends TestCase
 
         $this->actingAs($manager)
             ->put(route('accounts.update', $account), ['username' => 'ada spasi'])
+            ->assertSessionHasErrors(['fullname', 'username', 'division_id'])
+            ->assertSessionDoesntHaveErrors('role_id');
+
+        $this->actingAs(Account::factory()->admin()->create())
+            ->put(route('accounts.update', $account), ['username' => 'ada spasi'])
             ->assertSessionHasErrors(['fullname', 'username', 'role_id', 'division_id']);
+    }
+
+    public function test_only_admin_edit_form_has_role_field(): void
+    {
+        $account = Account::factory()->employee()->create();
+
+        $this->actingAs(Account::factory()->manager()->create())
+            ->get(route('accounts.edit', $account))
+            ->assertOk()
+            ->assertDontSee('name="role_id"', false)
+            ->assertSee('Role hanya dapat diubah oleh Admin.');
+
+        $this->actingAs(Account::factory()->admin()->create())
+            ->get(route('accounts.edit', $account))
+            ->assertOk()
+            ->assertSee('name="role_id"', false)
+            ->assertDontSee('Role hanya dapat diubah oleh Admin.');
     }
 
     public function test_update_rejects_username_taken_by_another_account(): void
