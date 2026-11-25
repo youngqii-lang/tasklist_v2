@@ -84,22 +84,27 @@ class TaskStatusWorkflowTest extends TestCase
         ], Task::STATUS_LABELS);
     }
 
-    public function test_admin_manager_supervisor_and_pic_move_backlog_to_todo(): void
+    public function test_only_the_pic_moves_backlog_to_todo(): void
     {
-        $accounts = [
+        $this->moveTo($this->pic, $this->task(Task::STATUS_BACKLOG), Task::STATUS_TODO)
+            ->assertOk()
+            ->assertJsonPath('message', 'Status tugas berhasil diperbarui.')
+            ->assertJsonPath('data.status', Task::STATUS_TODO);
+
+        $managers = [
             Account::factory()->admin()->create(),
             $this->manager,
             Account::factory()->supervisor()->for($this->division)->create(),
-            $this->pic,
         ];
 
-        foreach ($accounts as $account) {
+        foreach ($managers as $account) {
             $task = $this->task(Task::STATUS_BACKLOG);
 
             $this->moveTo($account, $task, Task::STATUS_TODO)
-                ->assertOk()
-                ->assertJsonPath('message', 'Status tugas berhasil diperbarui.')
-                ->assertJsonPath('data.status', Task::STATUS_TODO);
+                ->assertForbidden()
+                ->assertJsonPath('message', 'Hanya PIC tugas ini yang dapat melakukan perpindahan status ini.');
+
+            $this->assertSame(Task::STATUS_BACKLOG, $task->fresh()->status);
         }
     }
 
@@ -131,28 +136,23 @@ class TaskStatusWorkflowTest extends TestCase
 
     public function test_moving_up_to_on_process_has_no_requirements(): void
     {
-        $withoutPicOrDeadline = Task::factory()->for($this->division)->create(['status' => Task::STATUS_BACKLOG, 'deadline' => null]);
+        $taskWithoutDeadline = $this->task(Task::STATUS_BACKLOG, ['deadline' => null]);
 
-        $this->moveTo($this->manager, $withoutPicOrDeadline, Task::STATUS_TODO)->assertOk();
-        $this->moveTo($this->manager, $withoutPicOrDeadline, Task::STATUS_IN_PROGRESS)->assertOk();
-
-        $picTaskWithoutDeadline = $this->task(Task::STATUS_BACKLOG, ['deadline' => null]);
-
-        $this->moveTo($this->pic, $picTaskWithoutDeadline, Task::STATUS_TODO)->assertOk();
-        $this->moveTo($this->pic, $picTaskWithoutDeadline, Task::STATUS_IN_PROGRESS)->assertOk();
+        $this->moveTo($this->pic, $taskWithoutDeadline, Task::STATUS_TODO)->assertOk();
+        $this->moveTo($this->pic, $taskWithoutDeadline, Task::STATUS_IN_PROGRESS)->assertOk();
     }
 
-    public function test_pic_and_manager_can_start_and_submit_the_work(): void
+    public function test_only_the_pic_starts_and_submits_the_work(): void
     {
-        foreach ([$this->pic, $this->manager] as $account) {
-            $task = $this->withEvidence($this->task(Task::STATUS_TODO));
+        $task = $this->withEvidence($this->task(Task::STATUS_TODO));
 
-            $this->moveTo($account, $task, Task::STATUS_IN_PROGRESS)->assertOk();
-            $this->moveTo($account, $task, Task::STATUS_READY_REVIEW)->assertOk()->assertJsonPath('data.status_label', 'Ready Review');
-        }
+        $this->moveTo($this->manager, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
+        $this->moveTo($this->pic, $task, Task::STATUS_IN_PROGRESS)->assertOk();
+        $this->moveTo($this->manager, $task, Task::STATUS_READY_REVIEW)->assertForbidden();
+        $this->moveTo($this->pic, $task, Task::STATUS_READY_REVIEW)->assertOk()->assertJsonPath('data.status_label', 'Ready Review');
     }
 
-    public function test_only_the_pic_needs_evidence_to_move_a_task_to_ready_review(): void
+    public function test_pic_needs_evidence_to_move_a_task_to_ready_review(): void
     {
         $picTask = $this->task(Task::STATUS_IN_PROGRESS);
 
@@ -160,13 +160,15 @@ class TaskStatusWorkflowTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('message', 'Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
 
-        $this->moveTo($this->manager, $this->task(Task::STATUS_IN_PROGRESS), Task::STATUS_READY_REVIEW)->assertOk();
-
         $managerAsPic = Account::factory()->manager()->for($this->division)->create();
         $managerTask = Task::factory()->for($this->division)->create(['status' => Task::STATUS_IN_PROGRESS]);
         TaskAssignment::factory()->for($managerTask)->for($managerAsPic, 'account')->create();
 
         $this->moveTo($managerAsPic, $managerTask, Task::STATUS_READY_REVIEW)->assertUnprocessable();
+
+        TaskEvidence::factory()->for($managerTask)->for($managerAsPic, 'submitter')->create();
+
+        $this->moveTo($managerAsPic, $managerTask, Task::STATUS_READY_REVIEW)->assertOk();
     }
 
     public function test_pic_can_take_a_task_back_from_ready_review_to_on_process(): void
@@ -176,7 +178,8 @@ class TaskStatusWorkflowTest extends TestCase
         $this->actingAs($this->pic)->getJson(route('api.tasks.show', $task))
             ->assertJsonPath('data.abilities.transitions', [Task::STATUS_IN_PROGRESS]);
         $this->actingAs($this->manager)->getJson(route('api.tasks.show', $task))
-            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_ON_REVIEW, Task::STATUS_IN_PROGRESS]);
+            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_ON_REVIEW]);
+        $this->moveTo($this->manager, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
 
         $this->moveTo($this->pic, $task, Task::STATUS_IN_PROGRESS)->assertOk()->assertJsonPath('data.status', Task::STATUS_IN_PROGRESS);
         $this->moveTo($this->pic, $task, Task::STATUS_READY_REVIEW)->assertOk();
@@ -269,7 +272,8 @@ class TaskStatusWorkflowTest extends TestCase
         $task = $this->withEvidence($this->task(Task::STATUS_ON_REVIEW, ['requires_review' => true]));
 
         $this->moveTo($this->manager, $task, Task::STATUS_BACKLOG, ['note' => 'Revisi'])->assertOk();
-        $this->moveTo($this->manager, $task, Task::STATUS_TODO)->assertOk();
+        $this->moveTo($this->manager, $task, Task::STATUS_TODO)->assertForbidden();
+        $this->moveTo($this->pic, $task, Task::STATUS_TODO)->assertOk();
         $this->moveTo($this->pic, $task, Task::STATUS_IN_PROGRESS)->assertOk();
         $this->moveTo($this->pic, $task, Task::STATUS_READY_REVIEW)->assertOk();
 
@@ -284,8 +288,9 @@ class TaskStatusWorkflowTest extends TestCase
 
         $this->moveTo($otherStaff, $task, Task::STATUS_IN_PROGRESS)
             ->assertForbidden()
-            ->assertJsonPath('message', 'Hanya PIC tugas atau Admin/Manajer/Supervisor yang berwenang yang dapat melakukan perpindahan status ini.');
+            ->assertJsonPath('message', 'Hanya PIC tugas ini yang dapat melakukan perpindahan status ini.');
         $this->moveTo($otherSupervisor, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
+        $this->moveTo($this->manager, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
 
         $this->assertSame(Task::STATUS_TODO, $task->fresh()->status);
     }
@@ -345,12 +350,12 @@ class TaskStatusWorkflowTest extends TestCase
 
         $this->actingAs($this->manager)
             ->getJson(route('api.tasks.show', $task))
-            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_READY_REVIEW, Task::STATUS_DONE]);
+            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_DONE]);
 
         $reviewTask = $this->task(Task::STATUS_IN_PROGRESS, ['requires_review' => true]);
 
         $this->actingAs($this->manager)
             ->getJson(route('api.tasks.show', $reviewTask))
-            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_READY_REVIEW]);
+            ->assertJsonPath('data.abilities.transitions', []);
     }
 }

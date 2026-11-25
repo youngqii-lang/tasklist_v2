@@ -50,7 +50,7 @@ class TaskActivityHistoryTest extends TestCase
             [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_READY_REVIEW]],
             [$manager, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_ON_REVIEW]],
             [$manager, 'postJson', 'api.tasks.reviews.store', ['decision' => 'revision_requested', 'note' => 'Ganti foto']],
-            [$manager, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_TODO]],
+            [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_TODO]],
             [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_IN_PROGRESS]],
             [$pic, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_READY_REVIEW]],
             [$manager, 'patchJson', 'api.tasks.status.update', ['status' => Task::STATUS_ON_REVIEW]],
