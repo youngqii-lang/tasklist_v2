@@ -197,29 +197,51 @@ class TaskEvidenceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_task_that_requires_evidence_cannot_be_submitted_without_it(): void
+    public function test_pic_needs_evidence_before_ready_review_whatever_the_category(): void
     {
-        $this->task->update(['requires_review' => true, 'evidence_required' => true]);
+        foreach ([true, false] as $evidenceRequired) {
+            $task = Task::factory()->for($this->division)->create([
+                'status' => Task::STATUS_IN_PROGRESS,
+                'requires_review' => true,
+                'evidence_required' => $evidenceRequired,
+            ]);
+            TaskAssignment::factory()->for($task)->for($this->pic, 'account')->create();
 
-        $this->actingAs($this->pic)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 1])
-            ->assertUnprocessable()
-            ->assertJsonPath('message', 'Tugas ini wajib melampirkan evidence sebelum dikirim.');
+            $this->actingAs($this->pic)
+                ->patchJson(route('api.tasks.status.update', $task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 1])
+                ->assertUnprocessable()
+                ->assertJsonPath('message', 'Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
 
-        TaskEvidence::factory()->for($this->task)->create();
+            $this->assertSame(Task::STATUS_IN_PROGRESS, $task->fresh()->status);
 
-        $this->actingAs($this->pic)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 1])
-            ->assertOk();
+            TaskEvidence::factory()->for($task)->create();
+
+            $this->actingAs($this->pic)
+                ->patchJson(route('api.tasks.status.update', $task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 1])
+                ->assertOk();
+        }
     }
 
-    public function test_task_with_optional_evidence_can_be_submitted_without_it(): void
+    public function test_evidence_requirement_of_the_task_applies_when_finishing_without_review(): void
     {
-        $this->task->update(['requires_review' => false, 'evidence_required' => false]);
+        $manager = Account::factory()->manager()->for($this->division)->create();
 
-        $this->actingAs($this->pic)
-            ->patchJson(route('api.tasks.status.update', $this->task), ['status' => Task::STATUS_READY_REVIEW, 'version' => 1])
+        $optional = Task::factory()->for($this->division)->create([
+            'status' => Task::STATUS_IN_PROGRESS, 'requires_review' => false, 'evidence_required' => false,
+        ]);
+
+        $this->actingAs($manager)
+            ->patchJson(route('api.tasks.status.update', $optional), ['status' => Task::STATUS_DONE, 'version' => 1])
             ->assertOk();
+
+        $required = Task::factory()->for($this->division)->create([
+            'status' => Task::STATUS_IN_PROGRESS, 'requires_review' => false, 'evidence_required' => true,
+        ]);
+
+        $this->actingAs($manager)
+            ->patchJson(route('api.tasks.status.update', $required), ['status' => Task::STATUS_DONE, 'version' => 1])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Tugas ini wajib melampirkan evidence sebelum diselesaikan.');
     }
 
     public function test_previous_evidence_stays_available_after_a_revision(): void

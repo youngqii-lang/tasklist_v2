@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
 use App\Models\TaskAssignment;
+use App\Models\TaskEvidence;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -193,6 +194,7 @@ class TaskScopeTest extends TestCase
     public function test_every_active_pic_of_a_multi_pic_task_may_move_it_up_to_ready_review(): void
     {
         $this->sharedTask->update(['status' => Task::STATUS_TODO, 'evidence_required' => false]);
+        TaskEvidence::factory()->for($this->sharedTask)->for($this->pic, 'submitter')->create();
 
         $this->actingAs($this->pic)
             ->patchJson(route('api.tasks.status.update', $this->sharedTask), ['status' => Task::STATUS_IN_PROGRESS, 'version' => $this->sharedTask->fresh()->version])
