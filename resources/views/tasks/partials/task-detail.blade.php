@@ -80,7 +80,7 @@
                         <button x-show="task.abilities.delete" type="button" @click="deleteTask()" :disabled="busy !== null" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60">Hapus</button>
                     </div>
 
-                    <p x-show="transitions.includes('ready_review') && task.evidences.length === 0" class="text-xs text-amber-700">
+                    <p x-show="task.abilities.add_evidence && transitions.includes('ready_review') && task.evidences.length === 0" class="text-xs text-amber-700">
                         Sebelum "Kirim untuk Review", lampirkan minimal satu evidence di tab
                         <button type="button" @click="selectTab('evidence')" class="font-semibold underline hover:text-amber-900">Evidence</button>.
                     </p>
@@ -193,7 +193,7 @@
                             </div>
                         </form>
 
-                        <p x-show="task.evidences.length === 0 && ['backlog', 'todo', 'in_progress'].includes(task.status)" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.</p>
+                        <p x-show="task.abilities.add_evidence && task.evidences.length === 0 && ['backlog', 'todo', 'in_progress'].includes(task.status)" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.</p>
 
                         <ul class="space-y-2">
                             <li x-show="task.evidences.length === 0" class="py-6 text-center text-sm text-slate-400">Belum ada evidence.</li>

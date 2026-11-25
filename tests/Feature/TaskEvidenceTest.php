@@ -197,7 +197,7 @@ class TaskEvidenceTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_every_task_needs_evidence_before_ready_review(): void
+    public function test_pic_needs_evidence_before_ready_review_whatever_the_category(): void
     {
         foreach ([true, false] as $evidenceRequired) {
             $task = Task::factory()->for($this->division)->create([

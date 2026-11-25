@@ -33,9 +33,11 @@ export default {
         return task.abilities.transitions.length > 0 && !this.movingIds[task.id];
     },
 
-    /** Ready Review always needs evidence; the API checks it too, this only explains it before the request. */
+    /** A PIC needs evidence to move a task to Ready Review; the API checks it too, this only explains it before the request. */
     needsEvidence(task, status) {
-        return status === 'ready_review' && task?.evidences_count === 0;
+        const isPic = Boolean(task?.pics?.some((pic) => pic.id === this.config.user.id));
+
+        return status === 'ready_review' && isPic && task.evidences_count === 0;
     },
 
     isDropAllowed(status) {

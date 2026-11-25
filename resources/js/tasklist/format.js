@@ -125,6 +125,7 @@ export function transitionLabel(fromStatus, toStatus) {
     if (toStatus === 'done' && fromStatus === 'in_progress') return 'Selesaikan (tanpa QA)';
     if (toStatus === 'done' && fromStatus === 'on_review') return 'Approve (Done)';
     if (toStatus === 'backlog' && fromStatus === 'on_review') return 'Minta Revisi';
+    if (toStatus === 'in_progress' && fromStatus === 'ready_review') return 'Tarik Kembali untuk Diperbaiki';
 
     return TRANSITION_LABELS[toStatus] ?? toStatus;
 }

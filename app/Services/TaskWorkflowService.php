@@ -15,8 +15,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * Status workflow following the TASK-17 transition matrix.
  *
- * A PIC can move their own task from Back Log through To Do and On Process up to Ready Review; reviewing,
- * revising and finishing stay with the admin, manager or supervisor who manages the task.
+ * A PIC can move their own task from Back Log through To Do and On Process up to Ready Review, and take it back
+ * from Ready Review to On Process; reviewing, revising and finishing stay with the admin, manager or supervisor
+ * who manages the task.
  */
 class TaskWorkflowService
 {
@@ -39,7 +40,7 @@ class TaskWorkflowService
         Task::STATUS_BACKLOG => [Task::STATUS_TODO => self::BY_PIC_OR_MANAGER],
         Task::STATUS_TODO => [Task::STATUS_IN_PROGRESS => self::BY_PIC_OR_MANAGER],
         Task::STATUS_IN_PROGRESS => [Task::STATUS_READY_REVIEW => self::BY_PIC_OR_MANAGER, Task::STATUS_DONE => self::BY_MANAGER],
-        Task::STATUS_READY_REVIEW => [Task::STATUS_ON_REVIEW => self::BY_MANAGER],
+        Task::STATUS_READY_REVIEW => [Task::STATUS_ON_REVIEW => self::BY_MANAGER, Task::STATUS_IN_PROGRESS => self::BY_PIC_OR_MANAGER],
         Task::STATUS_ON_REVIEW => [Task::STATUS_DONE => self::BY_MANAGER, Task::STATUS_BACKLOG => self::BY_MANAGER],
     ];
 
@@ -97,7 +98,7 @@ class TaskWorkflowService
                     : 'Hanya Admin, Manajer, atau Supervisor yang berwenang yang dapat melakukan perpindahan status ini.');
             }
 
-            $this->ensureRequirementsAreMet($task, $toStatus);
+            $this->ensureRequirementsAreMet($actor, $task, $toStatus);
 
             $decision = $fromStatus === Task::STATUS_ON_REVIEW ? self::REVIEW_DECISIONS[$toStatus] : null;
 
@@ -180,17 +181,19 @@ class TaskWorkflowService
 
     /**
      * Moving from Back Log up to On Process has no requirements, since the reviewer checks the work afterwards.
-     * Handing work in for review always needs evidence; finishing without review needs it when the task asks for it.
+     * A PIC handing work in for review must attach evidence; finishing without review needs it when the task asks for it.
      *
      * @throws InvalidTaskTransitionException
      */
-    protected function ensureRequirementsAreMet(Task $task, string $toStatus): void
+    protected function ensureRequirementsAreMet(Account $actor, Task $task, string $toStatus): void
     {
         if (! $this->reviewRuleAllows($task, $toStatus)) {
             throw new InvalidTaskTransitionException('Tugas ini wajib review, kirim ke Ready Review terlebih dahulu.');
         }
 
-        if ($toStatus === Task::STATUS_READY_REVIEW && ! $task->evidences()->exists()) {
+        $picSubmitsForReview = $toStatus === Task::STATUS_READY_REVIEW && $task->hasActivePic($actor);
+
+        if ($picSubmitsForReview && ! $task->evidences()->exists()) {
             throw new InvalidTaskTransitionException('Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
         }
 

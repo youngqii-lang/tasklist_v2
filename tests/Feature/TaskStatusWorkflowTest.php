@@ -152,6 +152,45 @@ class TaskStatusWorkflowTest extends TestCase
         }
     }
 
+    public function test_only_the_pic_needs_evidence_to_move_a_task_to_ready_review(): void
+    {
+        $picTask = $this->task(Task::STATUS_IN_PROGRESS);
+
+        $this->moveTo($this->pic, $picTask, Task::STATUS_READY_REVIEW)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
+
+        $this->moveTo($this->manager, $this->task(Task::STATUS_IN_PROGRESS), Task::STATUS_READY_REVIEW)->assertOk();
+
+        $managerAsPic = Account::factory()->manager()->for($this->division)->create();
+        $managerTask = Task::factory()->for($this->division)->create(['status' => Task::STATUS_IN_PROGRESS]);
+        TaskAssignment::factory()->for($managerTask)->for($managerAsPic, 'account')->create();
+
+        $this->moveTo($managerAsPic, $managerTask, Task::STATUS_READY_REVIEW)->assertUnprocessable();
+    }
+
+    public function test_pic_can_take_a_task_back_from_ready_review_to_on_process(): void
+    {
+        $task = $this->withEvidence($this->task(Task::STATUS_READY_REVIEW));
+
+        $this->actingAs($this->pic)->getJson(route('api.tasks.show', $task))
+            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_IN_PROGRESS]);
+        $this->actingAs($this->manager)->getJson(route('api.tasks.show', $task))
+            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_ON_REVIEW, Task::STATUS_IN_PROGRESS]);
+
+        $this->moveTo($this->pic, $task, Task::STATUS_IN_PROGRESS)->assertOk()->assertJsonPath('data.status', Task::STATUS_IN_PROGRESS);
+        $this->moveTo($this->pic, $task, Task::STATUS_READY_REVIEW)->assertOk();
+
+        $otherStaff = Account::factory()->employee()->for($this->division)->create();
+        $this->moveTo($otherStaff, $task, Task::STATUS_IN_PROGRESS)->assertForbidden();
+
+        foreach ([Task::STATUS_TODO, Task::STATUS_BACKLOG, Task::STATUS_ON_REVIEW] as $status) {
+            $this->moveTo($this->pic, $task, $status)->assertStatus($status === Task::STATUS_ON_REVIEW ? 403 : 422);
+        }
+
+        $this->assertSame(Task::STATUS_READY_REVIEW, $task->fresh()->status);
+    }
+
     public function test_task_without_review_requirement_can_also_be_sent_to_ready_review(): void
     {
         $task = $this->withEvidence($this->task(Task::STATUS_IN_PROGRESS, ['requires_review' => false]));
