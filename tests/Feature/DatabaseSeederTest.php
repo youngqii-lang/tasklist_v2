@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Platform;
@@ -64,15 +65,8 @@ class DatabaseSeederTest extends TestCase
         $this->seed([DatabaseSeeder::class, DemoSeeder::class]);
 
         $this->assertSame(
-            [
-                Task::STATUS_BACKLOG => 3,
-                Task::STATUS_TODO => 4,
-                Task::STATUS_IN_PROGRESS => 5,
-                Task::STATUS_READY_REVIEW => 3,
-                Task::STATUS_ON_REVIEW => 2,
-                Task::STATUS_DONE => 3,
-            ],
-            collect(array_keys(Task::STATUS_LABELS))->mapWithKeys(fn (string $status) => [$status => Task::where('status', $status)->count()])->all(),
+            ['backlog' => 3, 'todo' => 4, 'in_progress' => 5, 'ready_review' => 3, 'on_review' => 2, 'done' => 3],
+            collect(TaskStatus::cases())->mapWithKeys(fn (TaskStatus $status) => [$status->value => Task::where('status', $status)->count()])->all(),
         );
 
         $tasks = Task::with(['pics.role', 'evidences', 'reviews', 'activities', 'division'])->get();
@@ -81,23 +75,23 @@ class DatabaseSeederTest extends TestCase
             $this->assertNotEmpty($task->activities, "{$task->title} has no history");
             $this->assertTrue($task->pics->every(fn (Account $pic) => $pic->division_id === $task->division_id && in_array($pic->role->code_role, Role::STAFF_ROLES, true)));
 
-            if ($task->status === Task::STATUS_BACKLOG) {
+            if ($task->status === TaskStatus::Backlog) {
                 continue;
             }
 
             $this->assertCount(1, $task->pics, "{$task->title} has no PIC");
             $this->assertNotNull($task->deadline, "{$task->title} has no deadline");
 
-            if (in_array($task->status, Task::REVIEW_STAGE_STATUSES, true)) {
+            if (in_array($task->status, [TaskStatus::ReadyReview, TaskStatus::OnReview, TaskStatus::Done], true)) {
                 $this->assertTrue($task->requires_review);
                 $this->assertNotEmpty($task->evidences);
             }
 
-            $this->assertSame($task->status === Task::STATUS_DONE, $task->completed_at !== null);
-            $this->assertSame($task->status === Task::STATUS_DONE ? 1 : 0, $task->reviews->count());
+            $this->assertSame($task->status === TaskStatus::Done, $task->completed_at !== null);
+            $this->assertSame($task->status === TaskStatus::Done ? 1 : 0, $task->reviews->count());
         }
 
-        $this->assertGreaterThan(0, $tasks->filter->isOverdue()->count());
+        $this->assertGreaterThan(0, $tasks->filter(fn (Task $task) => $task->status !== TaskStatus::Done && $task->deadline?->isPast() && ! $task->deadline->isToday())->count());
         $this->assertGreaterThan(0, $tasks->filter(fn (Task $task) => $task->deadline?->isToday())->count());
     }
 
