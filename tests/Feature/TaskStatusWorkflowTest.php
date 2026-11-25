@@ -73,12 +73,13 @@ class TaskStatusWorkflowTest extends TestCase
         ], Task::STATUS_LABELS);
     }
 
-    public function test_admin_manager_and_supervisor_move_backlog_to_todo(): void
+    public function test_admin_manager_supervisor_and_pic_move_backlog_to_todo(): void
     {
         $accounts = [
             Account::factory()->admin()->create(),
             $this->manager,
             Account::factory()->supervisor()->for($this->division)->create(),
+            $this->pic,
         ];
 
         foreach ($accounts as $account) {
@@ -89,8 +90,41 @@ class TaskStatusWorkflowTest extends TestCase
                 ->assertJsonPath('message', 'Status tugas berhasil diperbarui.')
                 ->assertJsonPath('data.status', Task::STATUS_TODO);
         }
+    }
 
-        $this->moveTo($this->pic, $this->task(Task::STATUS_BACKLOG), Task::STATUS_TODO)->assertForbidden();
+    public function test_pic_can_move_own_task_from_backlog_up_to_ready_review_but_not_further(): void
+    {
+        $task = $this->task(Task::STATUS_BACKLOG);
+
+        $this->actingAs($this->pic)->getJson(route('api.tasks.show', $task))
+            ->assertJsonPath('data.abilities.transitions', [Task::STATUS_TODO]);
+
+        foreach ([Task::STATUS_TODO, Task::STATUS_IN_PROGRESS, Task::STATUS_READY_REVIEW] as $status) {
+            $this->moveTo($this->pic, $task, $status)->assertOk()->assertJsonPath('data.status', $status);
+        }
+
+        $this->moveTo($this->pic, $task, Task::STATUS_ON_REVIEW)->assertForbidden();
+        $this->assertSame(Task::STATUS_READY_REVIEW, $task->fresh()->status);
+        $this->assertSame(3, $task->activities()->where('action', TaskActivity::ACTION_STATUS_CHANGED)->count()
+            + $task->activities()->where('action', TaskActivity::ACTION_SUBMITTED)->count());
+    }
+
+    public function test_staff_cannot_move_backlog_task_of_another_pic(): void
+    {
+        $otherStaff = Account::factory()->employee()->for($this->division)->create();
+        $task = $this->task(Task::STATUS_BACKLOG);
+
+        $this->moveTo($otherStaff, $task, Task::STATUS_TODO)->assertForbidden();
+        $this->assertSame(Task::STATUS_BACKLOG, $task->fresh()->status);
+    }
+
+    public function test_pic_still_needs_a_deadline_before_todo(): void
+    {
+        $task = $this->task(Task::STATUS_BACKLOG, ['deadline' => null]);
+
+        $this->moveTo($this->pic, $task, Task::STATUS_TODO)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Tugas wajib memiliki PIC dan deadline sebelum dipindahkan ke To Do.');
     }
 
     public function test_backlog_task_needs_a_pic_and_deadline_before_todo(): void
