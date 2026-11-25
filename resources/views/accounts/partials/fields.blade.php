@@ -86,6 +86,12 @@
             <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
         @enderror
     </div>
+@elseif ($account)
+    <div>
+        <p class="mb-1.5 text-sm font-medium text-slate-700">Role</p>
+        <p class="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200">{{ $account->role?->name ?? '-' }}</p>
+        <p class="mt-1.5 text-xs text-slate-500">Role hanya dapat diubah oleh Admin.</p>
+    </div>
 @endif
 
 <div>
@@ -93,10 +99,10 @@
     <select
         id="division_id"
         name="division_id"
-        required
+        @required(! $roles)
         @class([$fieldClass, $errors->has('division_id') ? $invalidClass : $validClass])
     >
-        <option value="" disabled @selected(! old('division_id', $account?->division_id))>Pilih divisi</option>
+        <option value="" @disabled(! $roles) @selected(! old('division_id', $account?->division_id))>{{ $roles ? 'Tanpa divisi' : 'Pilih divisi' }}</option>
         @foreach ($divisions as $division)
             <option value="{{ $division->id }}" @selected((string) old('division_id', $account?->division_id) === (string) $division->id)>
                 {{ $division->name }}
@@ -105,5 +111,9 @@
     </select>
     @error('division_id')
         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+    @else
+        @if ($roles)
+            <p class="mt-1.5 text-xs text-slate-500">Wajib diisi, kecuali untuk role Admin yang bekerja lintas divisi.</p>
+        @endif
     @enderror
 </div>

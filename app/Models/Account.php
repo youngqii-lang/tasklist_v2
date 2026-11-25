@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\AccountHasTaskHistoryException;
 use Database\Factories\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -71,6 +72,34 @@ class Account extends Authenticatable
     public function isManager(): bool
     {
         return $this->role?->code_role === Role::MANAGER;
+    }
+
+    /**
+     * Determine whether the account has a staff role (employee or freelance).
+     */
+    public function isStaff(): bool
+    {
+        return in_array($this->role?->code_role, Role::STAFF_ROLES, true);
+    }
+
+    /**
+     * Determine whether task data still refers to the account, so deleting it would break the task history.
+     */
+    public function hasTaskHistory(): bool
+    {
+        return TaskAssignment::where('account_id', $this->id)->exists()
+            || TaskComment::where('author_id', $this->id)->exists()
+            || CalendarEvent::where('creator_id', $this->id)->exists();
+    }
+
+    /**
+     * @throws AccountHasTaskHistoryException
+     */
+    public function ensureCanBeDeleted(): void
+    {
+        if ($this->hasTaskHistory()) {
+            throw new AccountHasTaskHistoryException;
+        }
     }
 
     /**

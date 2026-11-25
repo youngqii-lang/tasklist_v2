@@ -15,39 +15,34 @@ class AccountPolicy
     }
 
     /**
-     * Only managers and admins may create accounts.
+     * Only managers and admins may create accounts. Accounts created by managers always start as employees.
      */
     public function create(Account $user): bool
     {
-        return $this->managesAccounts($user);
+        return $user->isManager() || $user->isAdmin();
     }
 
     /**
-     * Only managers and admins may update accounts.
+     * Admins may update every account; managers only staff and freelance accounts.
      */
     public function update(Account $user, Account $account): bool
     {
-        return $this->managesAccounts($user);
+        return $user->isAdmin() || ($user->isManager() && $account->isStaff());
     }
 
     /**
-     * Only managers and admins may delete accounts, and never their own account.
+     * Deleting follows the same authority as updating, and nobody may delete their own account.
      */
     public function delete(Account $user, Account $account): bool
     {
-        return $this->managesAccounts($user) && $user->isNot($account);
+        return $this->update($user, $account) && $user->isNot($account);
     }
 
     /**
-     * Admins may choose the role of a new account; managers always create employees.
+     * Only admins may choose or change an account's role.
      */
-    public function assignRoleOnCreate(Account $user): bool
+    public function assignRole(Account $user): bool
     {
         return $user->isAdmin();
-    }
-
-    private function managesAccounts(Account $user): bool
-    {
-        return $user->isManager() || $user->isAdmin();
     }
 }

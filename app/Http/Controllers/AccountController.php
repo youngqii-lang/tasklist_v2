@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateAccountRequest;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Role;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -48,9 +49,7 @@ class AccountController extends Controller
         Gate::authorize('create', Account::class);
 
         return view('accounts.create', [
-            'roles' => $request->user()->can('assignRoleOnCreate', Account::class)
-                ? Role::orderBy('name')->get(['id', 'name'])
-                : null,
+            'roles' => $this->assignableRoles($request),
             'divisions' => Division::orderBy('name')->get(['id', 'name']),
         ]);
     }
@@ -71,15 +70,15 @@ class AccountController extends Controller
     }
 
     /**
-     * Show the form for editing the specified account.
+     * Show the form for editing the specified account. Only admins get to change the role.
      */
-    public function edit(Account $account): View
+    public function edit(Request $request, Account $account): View
     {
         Gate::authorize('update', $account);
 
         return view('accounts.edit', [
-            'account' => $account,
-            'roles' => Role::orderBy('name')->get(['id', 'name']),
+            'account' => $account->loadMissing('role'),
+            'roles' => $this->assignableRoles($request),
             'divisions' => Division::orderBy('name')->get(['id', 'name']),
         ]);
     }
@@ -103,16 +102,29 @@ class AccountController extends Controller
     }
 
     /**
-     * Permanently delete the specified account.
+     * Permanently delete the specified account, unless task data still refers to it.
      */
     public function destroy(Account $account): RedirectResponse
     {
         Gate::authorize('delete', $account);
 
+        $account->ensureCanBeDeleted();
         $account->delete();
 
         return redirect()
             ->route('accounts.index')
             ->with('status', "Akun {$account->fullname} berhasil dihapus.");
+    }
+
+    /**
+     * The roles the current user may pick from, or null when they may not choose a role.
+     *
+     * @return Collection<int, Role>|null
+     */
+    private function assignableRoles(Request $request): ?Collection
+    {
+        return $request->user()->can('assignRole', Account::class)
+            ? Role::orderBy('name')->get(['id', 'name'])
+            : null;
     }
 }

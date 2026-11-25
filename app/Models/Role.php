@@ -33,6 +33,13 @@ class Role extends Model
     public const array PIC_ROLES = [self::MANAGER, self::SUPERVISOR, self::EMPLOYEE, self::FREELANCE];
 
     /**
+     * Staff roles (Staff and Freelance). Managers may only manage the accounts of these roles.
+     *
+     * @var list<string>
+     */
+    public const array STAFF_ROLES = [self::EMPLOYEE, self::FREELANCE];
+
+    /**
      * Roles whose authority over the Tasklist covers every division.
      *
      * @var list<string>
