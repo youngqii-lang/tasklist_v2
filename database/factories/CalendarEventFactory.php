@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Account;
 use App\Models\CalendarEvent;
 use App\Models\Division;
+use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -13,31 +14,53 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class CalendarEventFactory extends Factory
 {
     /**
-     * Define the model's default state.
+     * Define the model's default state: a shared agenda without an organiser, covering whole days.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
-        $startAt = fake()->dateTimeBetween('now', '+1 month');
+        $start = fake()->dateTimeBetween('-2 weeks', '+2 weeks')->setTime(0, 0);
 
         return [
-            'division_id' => Division::factory(),
-            'creator_id' => Account::factory()->manager(),
+            'division_id' => null,
+            'creator_id' => fn () => $this->defaultCreatorId(),
             'title' => fake()->sentence(3),
-            'description' => fake()->paragraph(),
-            'start_at' => $startAt,
-            'end_at' => (clone $startAt)->modify('+2 hours'),
+            'description' => fake()->optional()->sentence(),
+            'is_shared' => true,
+            'start_at' => $start,
+            'end_at' => fake()->optional()->dateTimeBetween($start, (clone $start)->modify('+5 days'))?->setTime(0, 0),
         ];
     }
 
     /**
-     * Indicate that the event is company-wide rather than owned by a division.
+     * An internal agenda for the given divisions, organised by the first: only Admin and their accounts see it.
+     * Without a division only Admin sees it.
      */
-    public function companyWide(): static
+    public function internalTo(Division ...$targets): static
     {
-        return $this->state(fn (array $attributes) => [
-            'division_id' => null,
-        ]);
+        return $this->state(['is_shared' => false, 'division_id' => $targets[0]->id ?? null])
+            ->afterCreating(fn (CalendarEvent $event) => $event->targetDivisions()->attach(array_map(fn (Division $division) => $division->id, $targets)));
+    }
+
+    /**
+     * The first Admin account, created when there is none yet.
+     */
+    private function defaultCreatorId(): int
+    {
+        $admin = Account::whereHas('role', fn ($query) => $query->where('code_role', Role::ADMIN))->orderBy('id')->first();
+
+        if ($admin !== null) {
+            return $admin->id;
+        }
+
+        $role = Role::firstOrCreate(['code_role' => Role::ADMIN], ['name' => 'Admin']);
+
+        return Account::create([
+            'role_id' => $role->id,
+            'fullname' => 'Agenda Admin',
+            'username' => 'agenda.admin.'.fake()->unique()->numerify('####'),
+            'password' => 'password',
+        ])->id;
     }
 }

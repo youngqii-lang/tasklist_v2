@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
@@ -19,27 +21,33 @@ class TaskFactory extends Factory
      */
     public function definition(): array
     {
-        $startDate = fake()->dateTimeBetween('-1 week', '+1 week');
+        $startDate = fake()->optional()->dateTimeBetween('-1 month', '+1 week');
 
         return [
             'title' => fake()->sentence(4),
-            'description' => fake()->paragraph(),
-            'division_id' => Division::factory(),
-            'creator_id' => Account::factory()->manager(),
-            'priority' => fake()->randomElement(['low', 'medium', 'high', 'urgent']),
-            'status' => 'backlog',
+            'description' => fake()->optional()->paragraph(),
+            'division_id' => fn () => Division::create([
+                'code_division' => fake()->unique()->bothify('DIV-###??'),
+                'name' => fake()->unique()->lexify('Division ??????'),
+            ])->id,
+            'priority' => fake()->randomElement(TaskPriority::cases()),
+            'status' => TaskStatus::Backlog,
             'start_date' => $startDate,
-            'deadline' => fake()->dateTimeBetween($startDate, '+1 month'),        ];
+            'deadline' => $startDate ? fake()->dateTimeBetween($startDate, '+1 month') : null,
+            'requires_review' => fake()->boolean(),
+            'evidence_required' => fake()->boolean(),
+        ];
     }
 
     /**
-     * Indicate that the task has been completed.
+     * Active PICs for the task.
      */
-    public function done(): static
+    public function withPics(Account ...$pics): static
     {
-        return $this->state(fn (array $attributes) => [
-            'status' => 'done',
-            'completed_at' => now(),
-        ]);
+        return $this->afterCreating(function (Task $task) use ($pics) {
+            foreach ($pics as $pic) {
+                $task->assignments()->create(['account_id' => $pic->id, 'assigned_by' => $task->creator_id, 'assigned_at' => now()]);
+            }
+        });
     }
 }

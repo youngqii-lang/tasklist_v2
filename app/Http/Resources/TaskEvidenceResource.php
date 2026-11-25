@@ -2,43 +2,31 @@
 
 namespace App\Http\Resources;
 
-use App\Models\TaskEvidence;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @mixin TaskEvidence
- */
 class TaskEvidenceResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
-        $isFile = $this->type === TaskEvidence::TYPE_FILE;
-
         return [
             'id' => $this->id,
+            'task_id' => $this->task_id,
             'type' => $this->type,
-            'name' => $this->displayName(),
-            'title' => $this->title,
+            'kind' => $this->resource->kind(),
             'file_name' => $this->file_name,
-            'mime_type' => $this->mime_type,
+            'mime_type' => $this->resource->effectiveMimeType(),
             'file_size' => $this->file_size,
-            'is_image' => $this->isImage(),
+            'file_url' => $this->type === 'file' ? route('api.tasks.evidences.download', [$this->task_id, $this->id]) : null,
+            'preview_url' => $this->resource->previewable() ? route('api.tasks.evidences.preview', [$this->task_id, $this->id]) : null,
             'url' => $this->url,
-            'download_url' => $isFile ? route('api.tasks.evidences.download', [$this->task_id, $this->id]) : null,
-            'preview_url' => $this->isPreviewable() ? route('api.tasks.evidences.preview', [$this->task_id, $this->id]) : null,
-            'can_delete' => (bool) $request->user()?->can('deleteEvidence', [$this->task, $this->resource]),
             'note' => $this->note,
-            'submitter' => $this->whenLoaded('submitter', fn () => $this->submitter ? [
+            'submitter' => $this->submitter ? [
                 'id' => $this->submitter->id,
                 'fullname' => $this->submitter->fullname,
-            ] : null),
-            'created_at' => $this->created_at?->toIso8601String(),
+            ] : null,
+            'can_delete' => $this->resource->deletableBy($request->user()),
+            'created_at' => $this->created_at?->toIso8601ZuluString(),
         ];
     }
 }

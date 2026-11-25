@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Task;
@@ -43,7 +44,7 @@ class TasklistPageTest extends TestCase
             ->assertViewHas('config', fn (array $config) => $config['can_create'] === true
                 && $config['user']['is_admin'] === true
                 && $config['divisions']->pluck('id')->sort()->values()->all() === collect([$this->division->id, $otherDivision->id])->sort()->values()->all()
-                && collect($config['statuses'])->pluck('value')->all() === array_keys(Task::STATUS_LABELS));
+                && collect($config['statuses'])->pluck('value')->all() === array_column(TaskStatus::cases(), 'value'));
     }
 
     public function test_manager_can_create_tasks(): void
@@ -66,19 +67,21 @@ class TasklistPageTest extends TestCase
             ->assertViewHas('config', fn (array $config) => $config['can_create'] === false);
     }
 
-    public function test_pic_filter_lists_active_non_admin_accounts_of_every_division(): void
+    public function test_pic_filter_lists_active_staff_freelancers_and_supervisors_of_every_division(): void
     {
         $staff = Account::factory()->employee()->for($this->division)->create();
         $freelancer = Account::factory()->freelance()->for(Division::factory())->create();
-        $manager = Account::factory()->manager()->for($this->division)->create();
+        $supervisor = Account::factory()->supervisor()->for($this->division)->create();
         Account::factory()->employee()->inactive()->for($this->division)->create();
+        $manager = Account::factory()->manager()->for($this->division)->create();
         $admin = Account::factory()->admin()->for($this->division)->create();
 
         $this->actingAs($staff)->get(route('tasks.index'))
             ->assertOk()
             ->assertViewHas('config', fn (array $config) => collect($config['pics'])->pluck('id')->sort()->values()->all()
-                === collect([$staff->id, $freelancer->id, $manager->id])->sort()->values()->all()
-                && ! collect($config['pics'])->contains('id', $admin->id));
+                === collect([$staff->id, $freelancer->id, $supervisor->id])->sort()->values()->all()
+                && ! collect($config['pics'])->contains('id', $admin->id)
+                && ! collect($config['pics'])->contains('id', $manager->id));
     }
 
     public function test_inactive_account_cannot_open_the_tasklist(): void
@@ -95,7 +98,7 @@ class TasklistPageTest extends TestCase
         $this->actingAs($staff)->get(route('dashboard'))->assertOk()->assertSee(route('tasks.index'));
     }
 
-    public function test_task_abilities_tell_whether_the_user_manages_the_task(): void
+    public function test_task_flags_tell_whether_the_user_manages_the_task(): void
     {
         $task = Task::factory()->for($this->division)->create();
         $supervisor = Account::factory()->supervisor()->for($this->division)->create();
@@ -105,16 +108,19 @@ class TasklistPageTest extends TestCase
 
         $this->actingAs($supervisor)->getJson(route('api.tasks.show', $task))
             ->assertOk()
-            ->assertJsonPath('data.abilities.manage', true);
+            ->assertJsonPath('data.can_edit', true)
+            ->assertJsonPath('data.can_assign', true)
+            ->assertJsonPath('data.can_delete', true);
 
         $this->actingAs($otherSupervisor)->getJson(route('api.tasks.show', $task))
             ->assertOk()
-            ->assertJsonPath('data.abilities.manage', false)
-            ->assertJsonPath('data.abilities.update', false);
+            ->assertJsonPath('data.can_edit', false)
+            ->assertJsonPath('data.can_assign', false);
 
         $this->actingAs($pic)->getJson(route('api.tasks.show', $task))
             ->assertOk()
-            ->assertJsonPath('data.abilities.manage', false)
-            ->assertJsonPath('data.abilities.update', true);
+            ->assertJsonPath('data.can_assign', false)
+            ->assertJsonPath('data.can_delete', false)
+            ->assertJsonPath('data.next_statuses', [['value' => 'todo', 'label' => 'To Do']]);
     }
 }

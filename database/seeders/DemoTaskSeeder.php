@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Enums\TaskPriority;
+use App\Enums\TaskReviewDecision;
+use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Division;
 use App\Models\Platform;
@@ -9,7 +12,6 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskCategory;
 use App\Models\TaskEvidence;
-use App\Models\TaskReview;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,29 +28,29 @@ class DemoTaskSeeder extends Seeder
      * @var list<array{division: string, title: string, category: string, platform: string, priority: string, status: string, start: int|null, deadline: int|null, pic: string|null}>
      */
     public const array TASKS = [
-        ['division' => 'SEO', 'title' => 'Riset keyword JADIASN 2027', 'category' => 'Riset', 'platform' => 'JADIASN', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_BACKLOG, 'start' => null, 'deadline' => null, 'pic' => null],
-        ['division' => 'SEO', 'title' => 'Optimasi meta tag landing page JADIBUMN', 'category' => 'Konten', 'platform' => 'JADIBUMN', 'priority' => Task::PRIORITY_HIGH, 'status' => Task::STATUS_TODO, 'start' => 0, 'deadline' => 3, 'pic' => 'staff'],
-        ['division' => 'SEO', 'title' => 'Artikel SEO tips lolos SKD CPNS', 'category' => 'Konten', 'platform' => 'JADIASN', 'priority' => Task::PRIORITY_URGENT, 'status' => Task::STATUS_IN_PROGRESS, 'start' => -5, 'deadline' => -1, 'pic' => 'staff'],
-        ['division' => 'SEO', 'title' => 'Audit backlink website CEREBRUM', 'category' => 'Development', 'platform' => 'CEREBRUM', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_READY_REVIEW, 'start' => -7, 'deadline' => 2, 'pic' => 'freelance'],
-        ['division' => 'SEO', 'title' => 'Artikel pilar persiapan psikotes kerja', 'category' => 'Konten', 'platform' => 'PSIKOTESKERJA', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_DONE, 'start' => -14, 'deadline' => -3, 'pic' => 'freelance'],
+        ['division' => 'SEO', 'title' => 'Riset keyword JADIASN 2027', 'category' => 'Riset', 'platform' => 'JADIASN', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::Backlog->value, 'start' => null, 'deadline' => null, 'pic' => null],
+        ['division' => 'SEO', 'title' => 'Optimasi meta tag landing page JADIBUMN', 'category' => 'Konten', 'platform' => 'JADIBUMN', 'priority' => TaskPriority::High->value, 'status' => TaskStatus::Todo->value, 'start' => 0, 'deadline' => 3, 'pic' => 'staff'],
+        ['division' => 'SEO', 'title' => 'Artikel SEO tips lolos SKD CPNS', 'category' => 'Konten', 'platform' => 'JADIASN', 'priority' => TaskPriority::Urgent->value, 'status' => TaskStatus::InProgress->value, 'start' => -5, 'deadline' => -1, 'pic' => 'staff'],
+        ['division' => 'SEO', 'title' => 'Audit backlink website CEREBRUM', 'category' => 'Development', 'platform' => 'CEREBRUM', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::ReadyReview->value, 'start' => -7, 'deadline' => 2, 'pic' => 'freelance'],
+        ['division' => 'SEO', 'title' => 'Artikel pilar persiapan psikotes kerja', 'category' => 'Konten', 'platform' => 'PSIKOTESKERJA', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::Done->value, 'start' => -14, 'deadline' => -3, 'pic' => 'freelance'],
 
-        ['division' => 'MKT', 'title' => 'Rencana campaign Harbolnas 12.12', 'category' => 'Campaign', 'platform' => 'CEREBRUM', 'priority' => Task::PRIORITY_HIGH, 'status' => Task::STATUS_BACKLOG, 'start' => 5, 'deadline' => 20, 'pic' => null],
-        ['division' => 'MKT', 'title' => 'Jadwal posting Instagram JADIPOLISI', 'category' => 'Konten', 'platform' => 'JADIPOLISI', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_TODO, 'start' => 1, 'deadline' => 7, 'pic' => 'freelance'],
-        ['division' => 'MKT', 'title' => 'Iklan Meta Ads pendaftaran JADIPPPK', 'category' => 'Campaign', 'platform' => 'JADIPPPK', 'priority' => Task::PRIORITY_URGENT, 'status' => Task::STATUS_IN_PROGRESS, 'start' => -3, 'deadline' => 0, 'pic' => 'staff'],
-        ['division' => 'MKT', 'title' => 'Video promo try out JADIPRAJURIT', 'category' => 'Konten', 'platform' => 'JADIPRAJURIT', 'priority' => Task::PRIORITY_HIGH, 'status' => Task::STATUS_ON_REVIEW, 'start' => -10, 'deadline' => 1, 'pic' => 'staff'],
-        ['division' => 'MKT', 'title' => 'Email blast promo JADIBEASISWA', 'category' => 'Campaign', 'platform' => 'JADIBEASISWA', 'priority' => Task::PRIORITY_LOW, 'status' => Task::STATUS_DONE, 'start' => -12, 'deadline' => -5, 'pic' => 'freelance'],
+        ['division' => 'MKT', 'title' => 'Rencana campaign Harbolnas 12.12', 'category' => 'Campaign', 'platform' => 'CEREBRUM', 'priority' => TaskPriority::High->value, 'status' => TaskStatus::Backlog->value, 'start' => 5, 'deadline' => 20, 'pic' => null],
+        ['division' => 'MKT', 'title' => 'Jadwal posting Instagram JADIPOLISI', 'category' => 'Konten', 'platform' => 'JADIPOLISI', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::Todo->value, 'start' => 1, 'deadline' => 7, 'pic' => 'freelance'],
+        ['division' => 'MKT', 'title' => 'Iklan Meta Ads pendaftaran JADIPPPK', 'category' => 'Campaign', 'platform' => 'JADIPPPK', 'priority' => TaskPriority::Urgent->value, 'status' => TaskStatus::InProgress->value, 'start' => -3, 'deadline' => 0, 'pic' => 'staff'],
+        ['division' => 'MKT', 'title' => 'Video promo try out JADIPRAJURIT', 'category' => 'Konten', 'platform' => 'JADIPRAJURIT', 'priority' => TaskPriority::High->value, 'status' => TaskStatus::OnReview->value, 'start' => -10, 'deadline' => 1, 'pic' => 'staff'],
+        ['division' => 'MKT', 'title' => 'Email blast promo JADIBEASISWA', 'category' => 'Campaign', 'platform' => 'JADIBEASISWA', 'priority' => TaskPriority::Low->value, 'status' => TaskStatus::Done->value, 'start' => -12, 'deadline' => -5, 'pic' => 'freelance'],
 
-        ['division' => 'SLS', 'title' => 'Follow up leads webinar JADIOJK', 'category' => 'Operasional', 'platform' => 'JADIOJK', 'priority' => Task::PRIORITY_HIGH, 'status' => Task::STATUS_TODO, 'start' => -2, 'deadline' => -1, 'pic' => 'staff'],
-        ['division' => 'SLS', 'title' => 'Rekap penjualan paket bulan lalu', 'category' => 'Administrasi', 'platform' => 'CEREBRUM', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_IN_PROGRESS, 'start' => -4, 'deadline' => 2, 'pic' => 'staff'],
-        ['division' => 'SLS', 'title' => 'Penawaran kerja sama kampus TOEFLACADEMY', 'category' => 'Riset', 'platform' => 'TOEFLACADEMY', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_IN_PROGRESS, 'start' => -1, 'deadline' => 10, 'pic' => 'freelance'],
-        ['division' => 'SLS', 'title' => 'Materi presentasi B2B JADISEKDIN', 'category' => 'Desain', 'platform' => 'JADISEKDIN', 'priority' => Task::PRIORITY_HIGH, 'status' => Task::STATUS_READY_REVIEW, 'start' => -6, 'deadline' => 0, 'pic' => 'freelance'],
-        ['division' => 'SLS', 'title' => 'Script closing paket bimbel JAGOTPA', 'category' => 'Konten', 'platform' => 'JAGOTPA', 'priority' => Task::PRIORITY_LOW, 'status' => Task::STATUS_DONE, 'start' => -15, 'deadline' => -7, 'pic' => 'staff'],
+        ['division' => 'SLS', 'title' => 'Follow up leads webinar JADIOJK', 'category' => 'Operasional', 'platform' => 'JADIOJK', 'priority' => TaskPriority::High->value, 'status' => TaskStatus::Todo->value, 'start' => -2, 'deadline' => -1, 'pic' => 'staff'],
+        ['division' => 'SLS', 'title' => 'Rekap penjualan paket bulan lalu', 'category' => 'Administrasi', 'platform' => 'CEREBRUM', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::InProgress->value, 'start' => -4, 'deadline' => 2, 'pic' => 'staff'],
+        ['division' => 'SLS', 'title' => 'Penawaran kerja sama kampus TOEFLACADEMY', 'category' => 'Riset', 'platform' => 'TOEFLACADEMY', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::InProgress->value, 'start' => -1, 'deadline' => 10, 'pic' => 'freelance'],
+        ['division' => 'SLS', 'title' => 'Materi presentasi B2B JADISEKDIN', 'category' => 'Desain', 'platform' => 'JADISEKDIN', 'priority' => TaskPriority::High->value, 'status' => TaskStatus::ReadyReview->value, 'start' => -6, 'deadline' => 0, 'pic' => 'freelance'],
+        ['division' => 'SLS', 'title' => 'Script closing paket bimbel JAGOTPA', 'category' => 'Konten', 'platform' => 'JAGOTPA', 'priority' => TaskPriority::Low->value, 'status' => TaskStatus::Done->value, 'start' => -15, 'deadline' => -7, 'pic' => 'staff'],
 
-        ['division' => 'CRT', 'title' => 'Konsep maskot baru CEREBRUM', 'category' => 'Desain', 'platform' => 'CEREBRUM', 'priority' => Task::PRIORITY_LOW, 'status' => Task::STATUS_BACKLOG, 'start' => null, 'deadline' => 30, 'pic' => 'staff'],
-        ['division' => 'CRT', 'title' => 'Desain feed Instagram JADIPCPM', 'category' => 'Desain', 'platform' => 'JADIPCPM', 'priority' => Task::PRIORITY_MEDIUM, 'status' => Task::STATUS_TODO, 'start' => 2, 'deadline' => 9, 'pic' => 'freelance'],
-        ['division' => 'CRT', 'title' => 'Thumbnail YouTube kelas JADIASN', 'category' => 'Desain', 'platform' => 'JADIASN', 'priority' => Task::PRIORITY_URGENT, 'status' => Task::STATUS_IN_PROGRESS, 'start' => -2, 'deadline' => 1, 'pic' => 'staff'],
-        ['division' => 'CRT', 'title' => 'Banner promo JADIBUMN', 'category' => 'Desain', 'platform' => 'JADIBUMN', 'priority' => Task::PRIORITY_HIGH, 'status' => Task::STATUS_READY_REVIEW, 'start' => -5, 'deadline' => 1, 'pic' => 'staff'],
-        ['division' => 'CRT', 'title' => 'Motion graphic iklan JADIPOLISI', 'category' => 'Konten', 'platform' => 'JADIPOLISI', 'priority' => Task::PRIORITY_URGENT, 'status' => Task::STATUS_ON_REVIEW, 'start' => -8, 'deadline' => -2, 'pic' => 'freelance'],
+        ['division' => 'CRT', 'title' => 'Konsep maskot baru CEREBRUM', 'category' => 'Desain', 'platform' => 'CEREBRUM', 'priority' => TaskPriority::Low->value, 'status' => TaskStatus::Backlog->value, 'start' => null, 'deadline' => 30, 'pic' => 'staff'],
+        ['division' => 'CRT', 'title' => 'Desain feed Instagram JADIPCPM', 'category' => 'Desain', 'platform' => 'JADIPCPM', 'priority' => TaskPriority::Medium->value, 'status' => TaskStatus::Todo->value, 'start' => 2, 'deadline' => 9, 'pic' => 'freelance'],
+        ['division' => 'CRT', 'title' => 'Thumbnail YouTube kelas JADIASN', 'category' => 'Desain', 'platform' => 'JADIASN', 'priority' => TaskPriority::Urgent->value, 'status' => TaskStatus::InProgress->value, 'start' => -2, 'deadline' => 1, 'pic' => 'staff'],
+        ['division' => 'CRT', 'title' => 'Banner promo JADIBUMN', 'category' => 'Desain', 'platform' => 'JADIBUMN', 'priority' => TaskPriority::High->value, 'status' => TaskStatus::ReadyReview->value, 'start' => -5, 'deadline' => 1, 'pic' => 'staff'],
+        ['division' => 'CRT', 'title' => 'Motion graphic iklan JADIPOLISI', 'category' => 'Konten', 'platform' => 'JADIPOLISI', 'priority' => TaskPriority::Urgent->value, 'status' => TaskStatus::OnReview->value, 'start' => -8, 'deadline' => -2, 'pic' => 'freelance'],
     ];
 
     /**
@@ -85,7 +87,7 @@ class DemoTaskSeeder extends Seeder
      */
     protected function createTask(array $definition, int $divisionId, TaskCategory $category, int $platformId, Account $creator, ?Account $pic): void
     {
-        $status = $definition['status'];
+        $status = TaskStatus::from($definition['status']);
         $deadline = self::day($definition['deadline']);
 
         $task = Task::create([
@@ -101,7 +103,7 @@ class DemoTaskSeeder extends Seeder
             'deadline' => $deadline,
             'requires_review' => $category->requires_review,
             'evidence_required' => $category->evidence_required,
-            'completed_at' => $status === Task::STATUS_DONE ? $deadline->copy()->subDay()->setTime(16, 0) : null,
+            'completed_at' => $status === TaskStatus::Done ? $deadline->copy()->subDay()->setTime(16, 0) : null,
         ]);
 
         if ($pic !== null) {
@@ -112,37 +114,38 @@ class DemoTaskSeeder extends Seeder
             ]);
         }
 
-        $task->recordActivity($creator, TaskActivity::ACTION_CREATED, [
-            'title' => ['from' => null, 'to' => $task->title],
-            'status' => ['from' => null, 'to' => $status],
-            'pics' => ['from' => [], 'to' => $pic ? [['id' => $pic->id, 'fullname' => $pic->fullname]] : []],
-        ]);
+        $task->activities()->create(['account_id' => $creator->id, 'action' => TaskActivity::CREATED]);
 
-        if ($pic === null || ! in_array($status, Task::REVIEW_STAGE_STATUSES, true)) {
+        if ($pic === null || ! in_array($status, [TaskStatus::ReadyReview, TaskStatus::OnReview, TaskStatus::Done], true)) {
             return;
         }
 
         $evidence = $task->evidences()->create([
             'submitter_id' => $pic->id,
-            'type' => TaskEvidence::TYPE_LINK,
-            'title' => 'Hasil pekerjaan',
+            'type' => TaskEvidence::LINK,
             'url' => 'https://example.com/evidence/'.Str::slug($task->title),
         ]);
 
-        $task->recordActivity($pic, TaskActivity::ACTION_EVIDENCE_ADDED, [
-            'evidence' => ['id' => $evidence->id, 'type' => $evidence->type, 'name' => $evidence->displayName()],
+        $task->activities()->create([
+            'account_id' => $pic->id,
+            'action' => TaskActivity::EVIDENCE_SUBMITTED,
+            'changes' => ['evidence' => ['old' => null, 'new' => ['id' => $evidence->id, 'type' => $evidence->type, 'name' => $evidence->url]]],
         ]);
 
-        if ($status === Task::STATUS_DONE) {
-            $task->reviews()->create([
+        if ($status === TaskStatus::Done) {
+            $review = $task->reviews()->create([
                 'reviewer_id' => $creator->id,
-                'decision' => TaskReview::DECISION_APPROVED,
+                'decision' => TaskReviewDecision::Approve->value,
                 'note' => 'Sudah sesuai.',
             ]);
 
-            $task->recordActivity($creator, TaskActivity::ACTION_APPROVED, [
-                'status' => ['from' => Task::STATUS_ON_REVIEW, 'to' => Task::STATUS_DONE],
-                'note' => 'Sudah sesuai.',
+            $task->activities()->create([
+                'account_id' => $creator->id,
+                'action' => TaskActivity::APPROVED,
+                'changes' => [
+                    'status' => ['old' => TaskStatus::OnReview->value, 'new' => TaskStatus::Done->value],
+                    'review' => ['old' => null, 'new' => ['id' => $review->id, 'cycle' => 1, 'note' => $review->note]],
+                ],
             ]);
         }
     }

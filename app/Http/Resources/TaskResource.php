@@ -3,14 +3,9 @@
 namespace App\Http\Resources;
 
 use App\Models\Account;
-use App\Models\Task;
-use App\Services\TaskWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @mixin Task
- */
 class TaskResource extends JsonResource
 {
     /**
@@ -23,57 +18,26 @@ class TaskResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'description' => $this->description,
-            'status' => $this->status,
-            'status_label' => Task::STATUS_LABELS[$this->status] ?? $this->status,
-            'priority' => $this->priority,
-            'priority_label' => Task::PRIORITY_LABELS[$this->priority] ?? $this->priority,
+            'division' => [
+                'code_division' => $this->division->code_division,
+                'name' => $this->division->name,
+            ],
+            'pics' => $this->pics->map(fn (Account $pic) => ['id' => $pic->id, 'fullname' => $pic->fullname])->values()->all(),
+            'priority' => $this->priority->value,
+            'status' => $this->status->value,
             'start_date' => $this->start_date?->toDateString(),
             'deadline' => $this->deadline?->toDateString(),
-            'is_overdue' => $this->isOverdue(),
             'requires_review' => $this->requires_review,
             'evidence_required' => $this->evidence_required,
-            'division' => $this->whenLoaded('division', fn () => [
-                'id' => $this->division->id,
-                'name' => $this->division->name,
-            ]),
-            'category' => $this->whenLoaded('category', fn () => [
-                'id' => $this->category->id,
-                'name' => $this->category->name,
-            ]),
-            'platform' => $this->whenLoaded('platform', fn () => [
-                'id' => $this->platform->id,
-                'name' => $this->platform->name,
-            ]),
-            'creator' => $this->whenLoaded('creator', fn () => [
-                'id' => $this->creator->id,
-                'fullname' => $this->creator->fullname,
-            ]),
-            'pics' => $this->whenLoaded('pics', fn () => $this->pics->map(fn (Account $pic) => [
-                'id' => $pic->id,
-                'fullname' => $pic->fullname,
-                'username' => $pic->username,
-            ])->all()),
-            'evidences_count' => $this->whenCounted('evidences'),
-            'evidences' => TaskEvidenceResource::collection($this->whenLoaded('evidences')),
-            'reviews' => TaskReviewResource::collection($this->whenLoaded('reviews')),
-            'activities' => TaskActivityResource::collection($this->whenLoaded('activities')),
+            'evidence_count' => $this->whenCounted('evidences'),
+            'can_view_detail' => $request->user()->can('view', $this->resource),
+            'can_edit' => $request->user()->can('update', $this->resource),
+            'can_change_status' => $this->resource->nextStatusesFor($request->user()) !== [],
+            'can_review' => $this->resource->awaitsDecisionFrom($request->user()),
+            'can_assign' => $this->resource->assignmentLockFor($request->user()) === null,
+            'can_delete' => $this->resource->deletableBy($request->user()),
             'version' => $this->version,
-            'completed_at' => $this->completed_at?->toIso8601String(),
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
-            'abilities' => [
-                'manage' => (bool) $request->user()?->can('manage', $this->resource),
-                'update' => (bool) $request->user()?->can('update', $this->resource),
-                'delete' => (bool) $request->user()?->can('delete', $this->resource),
-                'assign' => (bool) $request->user()?->can('assign', $this->resource),
-                'add_evidence' => (bool) $request->user()?->can('addEvidence', $this->resource),
-                'review' => (bool) $request->user()?->can('review', $this->resource),
-                'comment' => $this->status !== Task::STATUS_DONE && (bool) $request->user()?->can('comment', $this->resource),
-                'transitions' => $request->user()
-                    ? app(TaskWorkflowService::class)->availableTransitions($request->user(), $this->resource)
-                    : [],
-            ],
+            'updated_at' => $this->updated_at?->toIso8601ZuluString(),
         ];
     }
 }

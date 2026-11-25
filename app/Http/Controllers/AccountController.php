@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreAccountRequest;
 use App\Http\Requests\UpdateAccountRequest;
 use App\Models\Account;
+use App\Models\AccountRoleChange;
 use App\Models\Division;
 use App\Models\Role;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -59,10 +61,16 @@ class AccountController extends Controller
      */
     public function store(StoreAccountRequest $request): RedirectResponse
     {
-        $account = Account::create([
-            ...$request->safe()->only(['fullname', 'username', 'password', 'division_id']),
-            'role_id' => $request->validated('role_id') ?? Role::where('code_role', Role::EMPLOYEE)->valueOrFail('id'),
-        ]);
+        $account = DB::transaction(function () use ($request) {
+            $account = Account::create([
+                ...$request->safe()->only(['fullname', 'username', 'password', 'division_id']),
+                'role_id' => $request->validated('role_id') ?? Role::where('code_role', Role::EMPLOYEE)->valueOrFail('id'),
+            ]);
+
+            AccountRoleChange::record($account, null, $request->user());
+
+            return $account;
+        });
 
         return redirect()
             ->route('accounts.index')
@@ -94,7 +102,15 @@ class AccountController extends Controller
             $attributes['password'] = $request->validated('password');
         }
 
-        $account->update($attributes);
+        DB::transaction(function () use ($request, $account, $attributes) {
+            $oldRoleId = $account->role_id;
+
+            $account->update($attributes);
+
+            if ($account->wasChanged('role_id')) {
+                AccountRoleChange::record($account, $oldRoleId, $request->user());
+            }
+        });
 
         return redirect()
             ->route('accounts.index')

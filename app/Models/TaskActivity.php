@@ -2,82 +2,97 @@
 
 namespace App\Models;
 
-use Database\Factories\TaskActivityFactory;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
+use App\Exceptions\TaskActivityImmutableException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['task_id', 'account_id', 'action', 'changes'])]
+/**
+ * One entry of a task's history. changes maps each changed field to its old and new value.
+ * Entries are append-only: once written they are never updated or deleted. The actor's name is copied in
+ * when the entry is written, so it is still shown after the account is deleted.
+ */
+#[Fillable(['task_id', 'account_id', 'actor_name_snapshot', 'action', 'changes'])]
 class TaskActivity extends Model
 {
-    /** @use HasFactory<TaskActivityFactory> */
-    use HasFactory;
+    public const CREATED = 'created';
+
+    public const UPDATED = 'updated';
+
+    public const DELETED = 'deleted';
+
+    public const ASSIGNED = 'assigned';
+
+    public const REASSIGNED = 'reassigned';
+
+    public const UNASSIGNED = 'unassigned';
+
+    public const STATUS_CHANGED = 'status_changed';
 
     /**
-     * Activities are append-only, so they have no "updated at" column.
+     * Evidence added to the task.
      */
-    public const UPDATED_AT = null;
+    public const EVIDENCE_SUBMITTED = 'evidence_submitted';
 
-    public const string ACTION_CREATED = 'created';
+    public const EVIDENCE_DELETED = 'evidence_deleted';
 
-    public const string ACTION_UPDATED = 'updated';
+    public const COMMENT_ADDED = 'comment_added';
 
-    public const string ACTION_DELETED = 'deleted';
+    public const APPROVED = 'approved';
 
-    public const string ACTION_PIC_CHANGED = 'pic_changed';
-
-    public const string ACTION_STATUS_CHANGED = 'status_changed';
-
-    public const string ACTION_EVIDENCE_ADDED = 'evidence_added';
-
-    public const string ACTION_EVIDENCE_DELETED = 'evidence_deleted';
-
-    public const string ACTION_SUBMITTED = 'submitted';
-
-    public const string ACTION_RESUBMITTED = 'resubmitted';
-
-    public const string ACTION_APPROVED = 'approved';
-
-    public const string ACTION_REVISION_REQUESTED = 'revision_requested';
+    public const REVISION_REQUESTED = 'revision_requested';
 
     /**
-     * Display labels for every recorded action.
-     *
-     * @var array<string, string>
+     * The PIC handed the task back to review after a revision.
      */
-    public const array ACTION_LABELS = [
-        self::ACTION_CREATED => 'Tugas dibuat',
-        self::ACTION_UPDATED => 'Informasi tugas diperbarui',
-        self::ACTION_DELETED => 'Tugas dihapus',
-        self::ACTION_PIC_CHANGED => 'PIC tugas diganti',
-        self::ACTION_STATUS_CHANGED => 'Status tugas diubah',
-        self::ACTION_EVIDENCE_ADDED => 'Evidence ditambahkan',
-        self::ACTION_EVIDENCE_DELETED => 'Evidence dihapus',
-        self::ACTION_SUBMITTED => 'Hasil kerja dikirim untuk diperiksa',
-        self::ACTION_RESUBMITTED => 'Hasil revisi dikirim ulang',
-        self::ACTION_APPROVED => 'Tugas disetujui',
-        self::ACTION_REVISION_REQUESTED => 'Revisi diminta',
+    public const RESUBMITTED = 'resubmitted';
+
+    public const ACTION_LABELS = [
+        self::CREATED => 'Tugas dibuat',
+        self::UPDATED => 'Informasi tugas diubah',
+        self::DELETED => 'Tugas dihapus',
+        self::ASSIGNED => 'PIC ditetapkan',
+        self::REASSIGNED => 'PIC diganti',
+        self::UNASSIGNED => 'PIC dilepas',
+        self::STATUS_CHANGED => 'Status diubah',
+        self::EVIDENCE_SUBMITTED => 'Evidence dikirim',
+        self::EVIDENCE_DELETED => 'Evidence dihapus',
+        self::COMMENT_ADDED => 'Komentar ditambahkan',
+        self::APPROVED => 'Tugas disetujui',
+        self::REVISION_REQUESTED => 'Revisi diminta',
+        self::RESUBMITTED => 'Hasil revisi dikirim ulang',
     ];
 
-    /**
-     * Get the task the activity belongs to.
-     *
-     * @return BelongsTo<Task, $this>
-     */
-    public function task(): BelongsTo
-    {
-        return $this->belongsTo(Task::class);
-    }
+    private const FIELD_LABELS = [
+        'title' => 'Judul',
+        'description' => 'Deskripsi',
+        'category' => 'Kategori',
+        'division' => 'Divisi',
+        'platform' => 'Platform',
+        'pic' => 'PIC',
+        'pics' => 'PIC',
+        'priority' => 'Prioritas',
+        'status' => 'Status',
+        'start_date' => 'Tanggal mulai',
+        'deadline' => 'Deadline',
+        'requires_review' => 'Wajib review',
+        'evidence_required' => 'Wajib evidence',
+    ];
 
-    /**
-     * Get the account that performed the activity.
-     *
-     * @return BelongsTo<Account, $this>
-     */
-    public function account(): BelongsTo
+    public const UPDATED_AT = null;
+
+    protected static function booted(): void
     {
-        return $this->belongsTo(Account::class);
+        static::creating(function (TaskActivity $activity) {
+            if ($activity->actor_name_snapshot === null && $activity->account_id !== null) {
+                $activity->actor_name_snapshot = Account::whereKey($activity->account_id)->value('fullname');
+            }
+        });
+
+        static::updating(fn () => throw new TaskActivityImmutableException);
+        static::deleting(fn () => throw new TaskActivityImmutableException);
     }
 
     /**
@@ -90,5 +105,113 @@ class TaskActivity extends Model
         return [
             'changes' => 'array',
         ];
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
+    }
+
+    public function actor(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    /**
+     * Who did it: the account as it is now, or the name copied in when the entry was written once the
+     * account no longer exists.
+     *
+     * @return array{id: ?int, fullname: string}|null
+     */
+    public function actorSummary(): ?array
+    {
+        if ($this->actor) {
+            return ['id' => $this->actor->id, 'fullname' => $this->actor->fullname];
+        }
+
+        return $this->actor_name_snapshot === null
+            ? null
+            : ['id' => $this->account_id, 'fullname' => $this->actor_name_snapshot];
+    }
+
+    public function actionLabel(): string
+    {
+        return self::ACTION_LABELS[$this->action] ?? $this->action;
+    }
+
+    /**
+     * The stored changes in a fixed order: fields in the order of FIELD_LABELS (other keys such as evidence and review
+     * after them), each as old then new. MySQL's JSON column does not keep key order, so without this the history would
+     * read differently depending on the database.
+     *
+     * @return array<string, mixed>
+     */
+    public function orderedChanges(): array
+    {
+        // $this->changes is Eloquent's own dirty-tracking property, not the column.
+        $changes = $this->getAttribute('changes') ?? [];
+        $rank = array_flip(array_keys(self::FIELD_LABELS));
+
+        uksort($changes, fn (string $a, string $b) => [$rank[$a] ?? PHP_INT_MAX, $a] <=> [$rank[$b] ?? PHP_INT_MAX, $b]);
+
+        return array_map(
+            fn (mixed $change) => is_array($change) && array_key_exists('old', $change) && array_key_exists('new', $change)
+                ? ['old' => $change['old'], 'new' => $change['new']] + $change
+                : $change,
+            $changes,
+        );
+    }
+
+    /**
+     * Human-readable summary of what changed, built from the stored old and new values.
+     */
+    public function description(): string
+    {
+        $changes = $this->orderedChanges();
+        $parts = [];
+
+        foreach ($changes as $field => $change) {
+            if (in_array($field, ['evidence', 'review', 'comment'], true)) {
+                continue;
+            }
+
+            $label = self::FIELD_LABELS[$field] ?? $field;
+
+            $parts[] = $field === 'description'
+                ? "{$label} diperbarui"
+                : "{$label}: {$this->formatValue($field, $change['old'] ?? null)} → {$this->formatValue($field, $change['new'] ?? null)}";
+        }
+
+        if ($evidence = $changes['evidence']['new'] ?? $changes['evidence']['old'] ?? null) {
+            $parts[] = 'Evidence: '.($evidence['name'] ?? '-');
+        }
+
+        if ($changes['comment']['new']['parent_comment_id'] ?? null) {
+            $parts[] = 'Membalas komentar';
+        }
+
+        if ($note = $changes['review']['new']['note'] ?? null) {
+            $parts[] = "Catatan: {$note}";
+        }
+
+        if ($parts === []) {
+            return $this->action === self::CREATED ? 'Membuat tugas.' : $this->actionLabel().'.';
+        }
+
+        return implode('; ', $parts);
+    }
+
+    private function formatValue(string $field, mixed $value): string
+    {
+        return match (true) {
+            $value === null || $value === '' || $value === [] => '-',
+            // A list of references, such as the PICs before and after an assignment change.
+            is_array($value) && array_is_list($value) => implode(', ', array_map(fn (mixed $item) => is_array($item) ? (string) ($item['name'] ?? '-') : (string) $item, $value)),
+            is_array($value) => (string) ($value['name'] ?? '-'),
+            is_bool($value) => $value ? 'Ya' : 'Tidak',
+            $field === 'status' => TaskStatus::tryFrom($value)?->label() ?? (string) $value,
+            $field === 'priority' => TaskPriority::tryFrom($value)?->label() ?? (string) $value,
+            default => (string) $value,
+        };
     }
 }

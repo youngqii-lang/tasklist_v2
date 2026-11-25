@@ -8,44 +8,43 @@ use Illuminate\Database\Seeder;
 
 class PermissionSeeder extends Seeder
 {
-    /**
-     * Permission codes granted to each role, following the TASK-12 RBAC matrix.
-     *
-     * Admins act on every division; managers and supervisors only on the division they manage;
-     * staff and freelancers only on the tasks assigned to them.
-     *
-     * @var array<string, list<string>>
-     */
-    public const array ROLE_PERMISSIONS = [
-        Role::ADMIN => ['task.view_all', 'task.create', 'task.update_all', 'task.update_assigned', 'task.assign', 'task.review'],
-        Role::MANAGER => ['task.view_all', 'task.create', 'task.update_all', 'task.assign', 'task.review'],
-        Role::SUPERVISOR => ['task.view_all', 'task.create', 'task.update_all', 'task.assign', 'task.review'],
-        Role::EMPLOYEE => ['task.view_all', 'task.update_assigned'],
-        Role::FREELANCE => ['task.view_all', 'task.update_assigned'],
+    private const PERMISSIONS = [
+        Permission::TASK_VIEW_ALL => 'Melihat daftar dan detail tugas seluruh divisi.',
+        Permission::TASK_CREATE => 'Membuat tugas.',
+        Permission::TASK_UPDATE => 'Mengubah informasi tugas.',
+        Permission::TASK_DELETE => 'Menghapus tugas.',
+        Permission::TASK_ASSIGN => 'Menetapkan dan melepas PIC tugas.',
+        Permission::TASK_REVIEW => 'Memberi keputusan review (Approve atau Request Revision).',
+        Permission::TASK_CHANGE_STATUS => 'Mengubah status tugas.',
     ];
 
     /**
-     * Seed the Tasklist permission codes and grant them to the roles. Run RoleSeeder first.
+     * Admin, Manager, and Supervisor manage tasks of every division. Staff and Freelance work on the tasks they are
+     * PIC of; which tasks and fields that covers is decided by the Backend, not by the permission alone.
+     */
+    private const ROLE_PERMISSIONS = [
+        Role::ADMIN => '*',
+        Role::MANAGER => '*',
+        Role::SUPERVISOR => '*',
+        Role::EMPLOYEE => [Permission::TASK_VIEW_ALL, Permission::TASK_UPDATE, Permission::TASK_CHANGE_STATUS],
+        Role::FREELANCE => [Permission::TASK_VIEW_ALL, Permission::TASK_UPDATE, Permission::TASK_CHANGE_STATUS],
+    ];
+
+    /**
+     * Requires RoleSeeder. Safe to run again: permissions are matched by code and each role's set is synced.
      */
     public function run(): void
     {
-        $permissions = [
-            ['code' => 'task.view_all', 'description' => 'Melihat seluruh task.'],
-            ['code' => 'task.create', 'description' => 'Membuat task baru.'],
-            ['code' => 'task.update_all', 'description' => 'Mengubah dan menghapus task dalam cakupan kewenangan (Admin lintas divisi, Manajer/Supervisor divisinya).'],
-            ['code' => 'task.update_assigned', 'description' => 'Mengubah task yang ditugaskan ke akun sendiri.'],
-            ['code' => 'task.assign', 'description' => 'Menugaskan atau melepas PIC task.'],
-            ['code' => 'task.review', 'description' => 'Memberi keputusan review task.'],
-        ];
-
-        foreach ($permissions as $permission) {
-            Permission::updateOrCreate(['code' => $permission['code']], $permission);
+        foreach (self::PERMISSIONS as $code => $description) {
+            Permission::updateOrCreate(['code' => $code], ['description' => $description]);
         }
 
-        foreach (self::ROLE_PERMISSIONS as $roleCode => $codes) {
-            Role::where('code_role', $roleCode)->first()?->permissions()->sync(
-                Permission::whereIn('code', $codes)->pluck('id')->all(),
-            );
+        $permissionIds = Permission::whereIn('code', array_keys(self::PERMISSIONS))->pluck('id', 'code');
+
+        foreach (self::ROLE_PERMISSIONS as $code => $granted) {
+            $ids = $granted === '*' ? $permissionIds->values() : $permissionIds->only($granted)->values();
+
+            Role::where('code_role', $code)->first()?->permissions()->sync($ids);
         }
     }
 }

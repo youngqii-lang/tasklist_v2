@@ -2,95 +2,105 @@
 
 namespace App\Models;
 
-use Database\Factories\TaskEvidenceFactory;
+use App\Services\TaskEvidenceService;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Table;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Table('task_evidences')]
-#[Fillable(['task_id', 'submitter_id', 'type', 'title', 'file_path', 'file_name', 'mime_type', 'file_size', 'url', 'note', 'deleted_by'])]
+#[Fillable(['task_id', 'submitter_id', 'type', 'file_path', 'file_name', 'mime_type', 'file_size', 'url', 'note', 'deleted_by'])]
 class TaskEvidence extends Model
 {
-    /** @use HasFactory<TaskEvidenceFactory> */
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
-    public const string TYPE_FILE = 'file';
+    // "evidence" is uncountable to the pluralizer, which would otherwise look for task_evidence.
+    protected $table = 'task_evidences';
 
-    public const string TYPE_LINK = 'link';
+    public const FILE = 'file';
 
-    /**
-     * MIME types that browsers may show inline instead of downloading.
-     *
-     * @var list<string>
-     */
-    public const array PREVIEWABLE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    public const LINK = 'link';
 
-    /**
-     * Get the name to show for the evidence: the file name, or the link title falling back to the link.
-     */
-    public function displayName(): string
-    {
-        return $this->type === self::TYPE_FILE ? (string) $this->file_name : (string) ($this->title ?: $this->url);
-    }
+    public const KIND_DOCUMENT = 'document';
+
+    public const KIND_IMAGE = 'image';
+
+    public const KIND_LINK = 'link';
 
     /**
-     * Determine whether the evidence is an image file, for thumbnails.
+     * Image types shown inline as a preview. SVG is left out on purpose: it can carry scripts.
      */
-    public function isImage(): bool
-    {
-        return $this->type === self::TYPE_FILE && str_starts_with((string) $this->mime_type, 'image/');
-    }
+    public const PREVIEWABLE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
     /**
-     * Determine whether the evidence file can be opened inline in the browser.
+     * MIME types of older files stored before the MIME type was recorded, read from their file name.
      */
-    public function isPreviewable(): bool
-    {
-        return $this->type === self::TYPE_FILE && in_array($this->mime_type, self::PREVIEWABLE_MIME_TYPES, true);
-    }
+    private const MIME_TYPES_BY_EXTENSION = [
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        'pdf' => 'application/pdf',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
 
-    /**
-     * Get the task the evidence belongs to.
-     *
-     * @return BelongsTo<Task, $this>
-     */
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
     }
 
-    /**
-     * Get the account that submitted the evidence.
-     *
-     * @return BelongsTo<Account, $this>
-     */
     public function submitter(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'submitter_id');
     }
 
-    /**
-     * Get the account that soft deleted the evidence.
-     *
-     * @return BelongsTo<Account, $this>
-     */
-    public function deleter(): BelongsTo
+    public function deletedBy(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'deleted_by');
     }
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * The MIME type recorded at upload, or for older files the one their name implies. Null for links.
      */
-    protected function casts(): array
+    public function effectiveMimeType(): ?string
     {
-        return [
-            'file_size' => 'integer',
-        ];
+        if ($this->type !== self::FILE) {
+            return null;
+        }
+
+        return $this->mime_type
+            ?? self::MIME_TYPES_BY_EXTENSION[strtolower(pathinfo((string) $this->file_name, PATHINFO_EXTENSION))] ?? null;
+    }
+
+    /**
+     * What the evidence is for display: an image, a document (every other file), or a link.
+     */
+    public function kind(): string
+    {
+        if ($this->type !== self::FILE) {
+            return self::KIND_LINK;
+        }
+
+        return str_starts_with((string) $this->effectiveMimeType(), 'image/') ? self::KIND_IMAGE : self::KIND_DOCUMENT;
+    }
+
+    public function previewable(): bool
+    {
+        return in_array($this->effectiveMimeType(), self::PREVIEWABLE_MIME_TYPES, true);
+    }
+
+    /**
+     * Whether the account may delete this evidence right now: only the PIC who uploaded it, while still an active PIC
+     * with task.update, and only while the task still accepts evidence (Back Log, To Do, On Process), so evidence that is being
+     * or has been reviewed stays. Evidence without a known uploader cannot be deleted.
+     */
+    public function deletableBy(Account $account): bool
+    {
+        return $this->submitter_id !== null
+            && $this->submitter_id === $account->id
+            && $account->hasPermission(Permission::TASK_UPDATE)
+            && in_array($this->task->status, TaskEvidenceService::SUBMITTABLE_STATUSES, true)
+            && $this->task->assignedTo($account);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\CommentReplyOutsideTaskException;
 use Database\Factories\TaskCommentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,49 +11,49 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['task_id', 'author_id', 'author_role', 'parent_comment_id', 'content'])]
+/**
+ * A comment on a task, or a reply when parent_comment_id is set. A reply's parent must belong to the same task.
+ * Comments never change the task's status and are not review decisions. deleted_at exists for a future, approved
+ * delete-comment feature; nothing deletes comments yet.
+ */
+#[Fillable(['task_id', 'author_id', 'parent_comment_id', 'content', 'client_request_id'])]
 class TaskComment extends Model
 {
     /** @use HasFactory<TaskCommentFactory> */
     use HasFactory, SoftDeletes;
 
-    /**
-     * Get the task the comment belongs to.
-     *
-     * @return BelongsTo<Task, $this>
-     */
+    protected static function booted(): void
+    {
+        static::saving(function (TaskComment $comment) {
+            if ($comment->parent_comment_id === null || ! $comment->isDirty(['parent_comment_id', 'task_id'])) {
+                return;
+            }
+
+            $parentTaskId = self::withTrashed()->whereKey($comment->parent_comment_id)->value('task_id');
+
+            if ($parentTaskId === null || (int) $parentTaskId !== (int) $comment->task_id) {
+                throw new CommentReplyOutsideTaskException;
+            }
+        });
+    }
+
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
     }
 
-    /**
-     * Get the account that wrote the comment.
-     *
-     * @return BelongsTo<Account, $this>
-     */
     public function author(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'author_id');
     }
 
-    /**
-     * Get the comment this comment replies to.
-     *
-     * @return BelongsTo<TaskComment, $this>
-     */
     public function parent(): BelongsTo
     {
-        return $this->belongsTo(TaskComment::class, 'parent_comment_id');
+        return $this->belongsTo(self::class, 'parent_comment_id');
     }
 
-    /**
-     * Get the replies to this comment.
-     *
-     * @return HasMany<TaskComment, $this>
-     */
     public function replies(): HasMany
     {
-        return $this->hasMany(TaskComment::class, 'parent_comment_id');
+        return $this->hasMany(self::class, 'parent_comment_id')->orderBy('created_at')->orderBy('id');
     }
 }

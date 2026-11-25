@@ -2,112 +2,209 @@
 
 namespace App\Services;
 
-use App\Exceptions\TaskEvidenceLockedException;
+use App\Enums\TaskStatus;
 use App\Models\Account;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskEvidence;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class TaskEvidenceService
 {
     /**
-     * Statuses in which the evidence of a task can no longer be changed.
-     *
-     * @var list<string>
+     * Statuses in which the PIC is still working on the task and may add or delete their evidence without moving it.
+     * A revision sends the task back to Back Log, so new evidence can be sent right away; earlier evidence is never
+     * replaced.
      */
-    protected const array LOCKED_STATUSES = [Task::STATUS_ON_REVIEW, Task::STATUS_DONE];
+    public const SUBMITTABLE_STATUSES = [TaskStatus::Backlog, TaskStatus::Todo, TaskStatus::InProgress];
 
     /**
-     * Attach a file or link as evidence. The file is stored on the private evidence disk.
-     *
-     * @param  array{type: string, url?: string|null, note?: string|null}  $data
-     *
-     * @throws TaskEvidenceLockedException
+     * Stops the browser from guessing another type than the one served, so a file cannot be run as a script.
      */
-    public function add(Account $submitter, Task $task, array $data, ?UploadedFile $file = null): TaskEvidence
+    private const SAFE_HEADERS = ['X-Content-Type-Options' => 'nosniff'];
+
+    private const DISK = 'local';
+
+    /**
+     * Every evidence of the task, newest first, with who sent it.
+     *
+     * @return Collection<int, TaskEvidence>
+     */
+    public function list(Task $task): Collection
     {
-        if (in_array($task->status, self::LOCKED_STATUSES, true)) {
-            throw new TaskEvidenceLockedException;
+        return $task->evidences()->with('submitter')->get();
+    }
+
+    /**
+     * Store a file or link as evidence of the task, sent by its PIC, and record it in the task's history.
+     * The PIC and status are checked again on the locked row, so evidence cannot slip in while the task is being
+     * reassigned or handed to review. A stored file is removed again when saving the record fails, so no orphan file
+     * is left behind.
+     *
+     * @param  array{file?: UploadedFile, url?: ?string, note?: ?string}  $data
+     *
+     * @throws AuthorizationException When the submitter is no longer the task's PIC.
+     * @throws ValidationException When the task is no longer in a status that accepts evidence.
+     */
+    public function store(Task $task, Account $submitter, array $data): TaskEvidence
+    {
+        $this->ensureSubmittable($task, $submitter);
+
+        $file = $data['file'] ?? null;
+        $path = $file instanceof UploadedFile ? $this->storeFile($task, $file) : null;
+
+        try {
+            return DB::transaction(function () use ($task, $submitter, $data, $file, $path) {
+                $this->ensureSubmittable(Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail(), $submitter);
+
+                $evidence = $task->evidences()->create([
+                    'submitter_id' => $submitter->id,
+                    'type' => $path ? TaskEvidence::FILE : TaskEvidence::LINK,
+                    'file_path' => $path,
+                    'file_name' => $path ? $file->getClientOriginalName() : null,
+                    // The type detected from the content, never the one the browser claimed.
+                    'mime_type' => $path ? $file->getMimeType() : null,
+                    'file_size' => $path ? $file->getSize() : null,
+                    'url' => $path ? null : $data['url'],
+                    'note' => $data['note'] ?? null,
+                ]);
+
+                $task->activities()->create([
+                    'account_id' => $submitter->id,
+                    'action' => TaskActivity::EVIDENCE_SUBMITTED,
+                    'changes' => ['evidence' => [
+                        'old' => null,
+                        'new' => ['id' => $evidence->id, 'type' => $evidence->type, 'name' => $evidence->file_name ?? $evidence->url],
+                    ]],
+                ]);
+
+                return $evidence->load('submitter');
+            });
+        } catch (Throwable $e) {
+            if ($path) {
+                Storage::disk(self::DISK)->delete($path);
+            }
+
+            throw $e;
         }
+    }
 
-        $attributes = [
-            'submitter_id' => $submitter->id,
-            'type' => $data['type'],
-            'note' => $data['note'] ?? null,
-        ];
+    /**
+     * Delete evidence the PIC uploaded (soft delete) and record it in the task's history. The stored file is kept so
+     * the deletion can be traced; the evidence leaves every list and can no longer be downloaded. The task itself, its
+     * status, and other evidence are not touched. The task and the evidence are read again under lock, so evidence
+     * cannot be deleted while the task is being reassigned or handed to review, and a request that lost the race to delete
+     * the same evidence stops without adding to the history.
+     *
+     * @throws ModelNotFoundException When the evidence has already been deleted.
+     * @throws AuthorizationException When the account is not the PIC who uploaded it.
+     * @throws ValidationException When the task is no longer in a status in which evidence may change.
+     */
+    public function delete(Task $task, TaskEvidence $evidence, Account $actor): void
+    {
+        abort_unless($evidence->task_id === $task->id, 404);
 
-        if ($data['type'] === TaskEvidence::TYPE_FILE) {
-            $attributes += [
-                'file_path' => $file->store("task-evidences/{$task->id}", $this->disk()),
-                'file_name' => Str::limit($file->getClientOriginalName(), 255, ''),
-                'mime_type' => $file->getMimeType(),
-                'file_size' => $file->getSize(),
-            ];
-        } else {
-            $attributes['url'] = $data['url'];
-            $attributes['title'] = $data['title'] ?? null;
-        }
+        DB::transaction(function () use ($task, $evidence, $actor) {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+            $current = $locked->evidences()->whereKey($evidence->id)->lockForUpdate()->firstOrFail();
 
-        return DB::transaction(function () use ($submitter, $task, $attributes) {
-            $evidence = $task->evidences()->create($attributes);
+            if ($current->submitter_id !== $actor->id || ! $locked->assignedTo($actor)) {
+                throw new AuthorizationException;
+            }
 
-            $task->recordActivity($submitter, TaskActivity::ACTION_EVIDENCE_ADDED, [
-                'evidence' => ['id' => $evidence->id, 'type' => $evidence->type, 'name' => $evidence->displayName()],
+            if (! in_array($locked->status, self::SUBMITTABLE_STATUSES, true)) {
+                throw ValidationException::withMessages([
+                    'evidence' => "Evidence hanya dapat dihapus saat tugas berstatus Back Log, To Do, atau On Process, bukan {$locked->status->label()}.",
+                ]);
+            }
+
+            $current->deleted_by = $actor->id;
+            $current->save();
+            $current->delete();
+
+            $locked->activities()->create([
+                'account_id' => $actor->id,
+                'action' => TaskActivity::EVIDENCE_DELETED,
+                'changes' => ['evidence' => [
+                    'old' => ['id' => $current->id, 'type' => $current->type, 'name' => $current->file_name ?? $current->url],
+                    'new' => null,
+                ]],
             ]);
-
-            return $evidence->load('submitter');
         });
     }
 
     /**
-     * Remove an evidence the PIC uploaded. It is soft deleted, so the review trail keeps it, and the file stays stored.
-     *
-     * @throws TaskEvidenceLockedException
+     * Only file evidence of this task has something to download; evidence of another task, a link, or a
+     * missing stored file is treated as not found.
      */
-    public function delete(Account $actor, Task $task, TaskEvidence $evidence): void
+    public function download(Task $task, TaskEvidence $evidence): StreamedResponse
     {
-        if (in_array($task->status, self::LOCKED_STATUSES, true)) {
-            throw new TaskEvidenceLockedException;
+        $this->ensureStoredFile($task, $evidence);
+
+        return Storage::disk(self::DISK)->download($evidence->file_path, $evidence->file_name, self::SAFE_HEADERS);
+    }
+
+    /**
+     * Show a JPG, PNG, or WEBP image inline so it can be previewed. Every other evidence is treated as not found;
+     * documents are opened through download().
+     */
+    public function preview(Task $task, TaskEvidence $evidence): StreamedResponse
+    {
+        $this->ensureStoredFile($task, $evidence);
+        abort_unless($evidence->previewable(), 404);
+
+        return Storage::disk(self::DISK)->response(
+            $evidence->file_path,
+            $evidence->file_name,
+            ['Content-Type' => $evidence->effectiveMimeType(), ...self::SAFE_HEADERS],
+            'inline',
+        );
+    }
+
+    private function ensureStoredFile(Task $task, TaskEvidence $evidence): void
+    {
+        abort_unless($evidence->task_id === $task->id, 404);
+        abort_unless($evidence->type === TaskEvidence::FILE && $evidence->file_path, 404);
+        abort_unless(Storage::disk(self::DISK)->exists($evidence->file_path), 404);
+    }
+
+    /**
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    private function ensureSubmittable(Task $task, Account $submitter): void
+    {
+        if (! $task->assignedTo($submitter)) {
+            throw new AuthorizationException;
         }
 
-        DB::transaction(function () use ($actor, $task, $evidence) {
-            $evidence->update(['deleted_by' => $actor->id]);
-            $evidence->delete();
-
-            $task->recordActivity($actor, TaskActivity::ACTION_EVIDENCE_DELETED, [
-                'evidence' => ['id' => $evidence->id, 'type' => $evidence->type, 'name' => $evidence->displayName()],
+        if (! in_array($task->status, self::SUBMITTABLE_STATUSES, true)) {
+            throw ValidationException::withMessages([
+                'evidence' => "Evidence hanya dapat dikirim saat tugas berstatus Back Log, To Do, atau On Process, bukan {$task->status->label()}.",
             ]);
-        });
+        }
     }
 
     /**
-     * Stream an evidence file as a download.
+     * Files are kept on the private disk per task and are only served through download().
      */
-    public function download(TaskEvidence $evidence): StreamedResponse
+    private function storeFile(Task $task, UploadedFile $file): string
     {
-        return Storage::disk($this->disk())->download($evidence->file_path, $evidence->file_name, [
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
-    }
+        $path = $file->store("task-evidences/{$task->id}", self::DISK);
 
-    /**
-     * Stream an image or PDF evidence inline for the preview. The stored MIME type is sent and sniffing is disabled.
-     */
-    public function preview(TaskEvidence $evidence): StreamedResponse
-    {
-        return Storage::disk($this->disk())->response($evidence->file_path, $evidence->file_name, [
-            'Content-Type' => $evidence->mime_type,
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
-    }
+        if ($path === false) {
+            throw new RuntimeException("Evidence file for task {$task->id} could not be stored.");
+        }
 
-    protected function disk(): string
-    {
-        return config('tasklist.evidence.disk');
+        return $path;
     }
 }
