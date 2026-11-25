@@ -86,6 +86,21 @@ class Task extends Model
         self::STATUS_DONE => 'Done',
     ];
 
+    /**
+     * "Semua Tugas": every task visible to the account.
+     */
+    public const string SCOPE_ALL = 'all';
+
+    /**
+     * "Tugas Saya": only tasks where the account is an active PIC.
+     */
+    public const string SCOPE_MINE = 'mine';
+
+    /**
+     * @var list<string>
+     */
+    public const array SCOPES = [self::SCOPE_ALL, self::SCOPE_MINE];
+
     public const string PRIORITY_LOW = 'low';
 
     public const string PRIORITY_MEDIUM = 'medium';
@@ -294,6 +309,32 @@ class Task extends Model
         if (! $account->is_active || ! $account->hasPermission('task.view_all')) {
             $query->whereRaw('1 = 0');
         }
+    }
+
+    /**
+     * Limit the query to tasks where the account is an active PIC ("Tugas Saya").
+     *
+     * An existence check keeps a Multi-PIC task to a single row; released PICs no longer match.
+     *
+     * @param  Builder<Task>  $query
+     */
+    #[Scope]
+    protected function assignedTo(Builder $query, Account $account): void
+    {
+        $query->whereHas('assignments', fn (Builder $assignments) => $assignments
+            ->where('account_id', $account->id)
+            ->whereNull('unassigned_at'));
+    }
+
+    /**
+     * Narrow the query to "Tugas Saya" when the task scope asks for it; "Semua Tugas" keeps every visible task.
+     *
+     * @param  Builder<Task>  $query
+     */
+    #[Scope]
+    protected function inTaskScope(Builder $query, Account $account, ?string $scope): void
+    {
+        $query->when($scope === self::SCOPE_MINE, fn (Builder $query) => $query->assignedTo($account));
     }
 
     /**

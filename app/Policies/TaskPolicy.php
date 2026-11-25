@@ -10,7 +10,7 @@ use App\Models\TaskEvidence;
 /**
  * Task permissions follow the role permissions in role_permissions (TASK-12 RBAC matrix).
  *
- * Admins act across every division; other roles only within the division they belong to.
+ * Admins and managers act across every division; supervisors only within the division they belong to.
  */
 class TaskPolicy
 {
@@ -39,7 +39,7 @@ class TaskPolicy
     }
 
     /**
-     * Admins may create tasks for every division; managers and supervisors only for their own division.
+     * Admins and managers may create tasks for every division; supervisors only for their own division.
      * Without a division, only the permission is checked.
      */
     public function create(Account $user, ?Division $division = null): bool
@@ -48,7 +48,7 @@ class TaskPolicy
             return false;
         }
 
-        if ($user->isAdmin()) {
+        if ($user->managesAllDivisions()) {
             return true;
         }
 
@@ -56,7 +56,7 @@ class TaskPolicy
     }
 
     /**
-     * Admins, and managers or supervisors of the task's division, fully manage the task.
+     * Admins and managers, and supervisors of the task's division, fully manage the task.
      */
     public function manage(Account $user, Task $task): bool
     {
@@ -73,11 +73,11 @@ class TaskPolicy
     }
 
     /**
-     * Deleting follows the same authority as editing.
+     * Only those who manage the task may delete its Task Card; staff and freelancers never may, even as PIC.
      */
     public function delete(Account $user, Task $task): bool
     {
-        return $this->update($user, $task);
+        return $this->manage($user, $task);
     }
 
     /**
@@ -123,19 +123,19 @@ class TaskPolicy
     }
 
     /**
-     * Only admins may move a task to another division.
+     * Only admins and managers may move a task to another division.
      */
     public function changeDivision(Account $user, Task $task, Division $division): bool
     {
-        return $task->division_id === $division->id || $user->isAdmin();
+        return $task->division_id === $division->id || $user->managesAllDivisions();
     }
 
     /**
-     * Admins cover every division; everyone else only their own division.
+     * Admins and managers cover every division; everyone else only their own division.
      */
     protected function coversDivision(Account $user, Task $task): bool
     {
-        if ($user->isAdmin()) {
+        if ($user->managesAllDivisions()) {
             return true;
         }
 

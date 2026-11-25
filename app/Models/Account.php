@@ -103,7 +103,15 @@ class Account extends Authenticatable
     }
 
     /**
-     * Limit the query to active staff accounts that can be assigned as task PIC.
+     * Determine whether the Tasklist authority of the account covers every division (Admin and Manajer).
+     */
+    public function managesAllDivisions(): bool
+    {
+        return in_array($this->role?->code_role, Role::ALL_DIVISION_ROLES, true);
+    }
+
+    /**
+     * Limit the query to active accounts that can be assigned as task PIC.
      *
      * @param  Builder<Account>  $query
      */
@@ -111,7 +119,7 @@ class Account extends Authenticatable
     protected function assignableAsPic(Builder $query, ?int $divisionId = null): void
     {
         $query->where('is_active', true)
-            ->whereHas('role', fn (Builder $role) => $role->whereIn('code_role', Role::STAFF_ROLES))
+            ->whereHas('role', fn (Builder $role) => $role->whereIn('code_role', Role::PIC_ROLES))
             ->when($divisionId !== null, fn (Builder $accounts) => $accounts->where('division_id', $divisionId));
     }
 

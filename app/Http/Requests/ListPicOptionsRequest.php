@@ -25,7 +25,7 @@ class ListPicOptionsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'division_id' => [Rule::requiredIf(! $this->user()?->isAdmin()), 'nullable', 'integer', Rule::exists('divisions', 'id')],
+            'division_id' => [Rule::requiredIf(! $this->user()?->managesAllDivisions()), 'nullable', 'integer', Rule::exists('divisions', 'id')],
         ];
     }
 

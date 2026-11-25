@@ -54,15 +54,15 @@ class UpdateTaskPicsRequest extends FormRequest
     }
 
     /**
-     * Admins may assign active staff of any division; others only staff of the task's division.
+     * Admins and managers may assign active PIC-role accounts of any division; supervisors only of the task's division.
      */
     protected function assignablePicRule(): Exists
     {
         $rule = Rule::exists('accounts', 'id')
             ->where('is_active', true)
-            ->whereIn('role_id', Role::whereIn('code_role', Role::STAFF_ROLES)->pluck('id')->all());
+            ->whereIn('role_id', Role::whereIn('code_role', Role::PIC_ROLES)->pluck('id')->all());
 
-        return $this->user()?->isAdmin() ? $rule : $rule->where('division_id', $this->task()->division_id);
+        return $this->user()?->managesAllDivisions() ? $rule : $rule->where('division_id', $this->task()->division_id);
     }
 
     /**
@@ -88,7 +88,7 @@ class UpdateTaskPicsRequest extends FormRequest
             'max' => ':attribute maksimal :max karakter.',
             'version.required' => 'Versi data tugas wajib dikirim.',
             'pic_ids.*.distinct' => 'PIC yang sama tidak boleh dipilih lebih dari sekali.',
-            'pic_ids.*.exists' => 'PIC harus akun Staff aktif yang berada dalam kewenangan Anda.',
+            'pic_ids.*.exists' => 'PIC harus akun aktif yang berada dalam kewenangan Anda.',
         ];
     }
 

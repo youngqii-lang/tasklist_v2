@@ -46,7 +46,7 @@ export default (config) => ({
     },
 
     get canChangeDivision() {
-        return !this.isEdit || this.config.user.is_admin;
+        return !this.isEdit || this.config.user.manages_all_divisions;
     },
 
     get selectedCategory() {
@@ -142,7 +142,7 @@ export default (config) => ({
     },
 
     async loadPics() {
-        const allDivisions = this.config.user.is_admin && this.pics.allDivisions;
+        const allDivisions = this.config.user.manages_all_divisions && this.pics.allDivisions;
 
         if (!allDivisions && !this.form.division_id) {
             this.pics.items = [];

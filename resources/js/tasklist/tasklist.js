@@ -4,6 +4,7 @@ import { formatting } from './format';
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
 const DEFAULT_FILTERS = {
+    scope: '',
     search: '',
     division_id: '',
     pic_id: '',
@@ -57,9 +58,13 @@ export default (config) => ({
         }
     },
 
-    /** The date basis alone filters nothing, so it does not count as an active filter. */
+    /** The date basis alone filters nothing, and the task scope is a tab, so neither counts as an active filter. */
     get hasActiveFilters() {
-        return Object.entries(this.filters).some(([key, value]) => key !== 'date_field' && value !== '');
+        return Object.entries(this.filters).some(([key, value]) => !['date_field', 'scope'].includes(key) && value !== '');
+    },
+
+    get isMyTasks() {
+        return this.filters.scope === 'mine';
     },
 
     get hasPeriod() {
@@ -77,7 +82,9 @@ export default (config) => ({
     },
 
     get emptyMessage() {
-        return this.hasActiveFilters ? 'Tidak ada tugas yang sesuai dengan filter.' : 'Belum ada tugas yang tersedia.';
+        if (this.hasActiveFilters) return 'Tidak ada tugas yang sesuai dengan filter.';
+
+        return this.isMyTasks ? 'Belum ada tugas yang ditugaskan kepada Anda.' : 'Belum ada tugas yang tersedia.';
     },
 
     statusLabel(status) {
@@ -198,8 +205,17 @@ export default (config) => ({
         this.$dispatch('tasklist-filters-changed', { filters: { ...this.filters } });
     },
 
+    /** Switch between "Semua Tugas" and "Tugas Saya"; every view follows the same scope. */
+    setScope(scope) {
+        if (this.filters.scope === scope) return;
+
+        this.filters.scope = scope;
+        this.applyFilters();
+    },
+
+    /** Reset keeps the chosen scope tab; only the filters below it are cleared. */
     resetFilters() {
-        this.filters = { ...DEFAULT_FILTERS };
+        this.filters = { ...DEFAULT_FILTERS, scope: this.filters.scope };
         this.period = emptyPeriod();
         this.sort = DEFAULT_SORT.sort;
         this.direction = DEFAULT_SORT.direction;

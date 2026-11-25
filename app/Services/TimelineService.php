@@ -24,7 +24,7 @@ class TimelineService
      * A task with only a start date or only a deadline is shown on that single day; a task without either is not shown.
      * Task items carry no internal details; `can_view_detail` tells whether the user may open the task.
      *
-     * @param  array{start_date?: string|null, mode?: string|null, division_id?: int|string|null}  $filters
+     * @param  array{start_date?: string|null, mode?: string|null, division_id?: int|string|null, scope?: string|null}  $filters
      * @return array{period: array{mode: string, from: string, to: string}, tasks: list<array<string, mixed>>, events: list<array<string, mixed>>}
      */
     public function build(Account $viewer, array $filters): array
@@ -38,7 +38,7 @@ class TimelineService
 
         return [
             'period' => ['mode' => $mode, 'from' => $from->toDateString(), 'to' => $to->toDateString()],
-            'tasks' => $this->tasks($viewer, $from, $to, $divisionId),
+            'tasks' => $this->tasks($viewer, $from, $to, $divisionId, $filters['scope'] ?? null),
             'events' => $this->events($from, $to, $divisionId),
         ];
     }
@@ -46,9 +46,11 @@ class TimelineService
     /**
      * @return list<array<string, mixed>>
      */
-    protected function tasks(Account $viewer, CarbonImmutable $from, CarbonImmutable $to, ?int $divisionId): array
+    protected function tasks(Account $viewer, CarbonImmutable $from, CarbonImmutable $to, ?int $divisionId, ?string $scope): array
     {
         return Task::query()
+            ->visibleTo($viewer)
+            ->inTaskScope($viewer, $scope)
             ->with(['division', 'pics'])
             ->when($divisionId, fn (Builder $query) => $query->where('division_id', $divisionId))
             ->where(fn (Builder $query) => $query

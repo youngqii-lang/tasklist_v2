@@ -63,7 +63,7 @@ class TaskRoleAccessTest extends TestCase
 
     public function test_viewing_does_not_grant_changing_tasks_outside_the_users_authority(): void
     {
-        $outsider = Account::factory()->manager()->create();
+        $outsider = Account::factory()->supervisor()->create();
 
         $this->actingAs($outsider)
             ->patchJson(route('api.tasks.update', $this->task), ['title' => 'Diubah', 'version' => 1])

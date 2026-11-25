@@ -26,11 +26,25 @@ class Role extends Model
     public const string FREELANCE = 'freelance';
 
     /**
-     * Roles whose accounts can be assigned as task PIC.
+     * Roles whose accounts can be assigned as task PIC. Admins maintain the system and are never PIC.
+     *
+     * @var list<string>
+     */
+    public const array PIC_ROLES = [self::MANAGER, self::SUPERVISOR, self::EMPLOYEE, self::FREELANCE];
+
+    /**
+     * Staff roles (Staff and Freelance). Managers may only manage the accounts of these roles.
      *
      * @var list<string>
      */
     public const array STAFF_ROLES = [self::EMPLOYEE, self::FREELANCE];
+
+    /**
+     * Roles whose authority over the Tasklist covers every division.
+     *
+     * @var list<string>
+     */
+    public const array ALL_DIVISION_ROLES = [self::ADMIN, self::MANAGER];
 
     /**
      * Get the accounts that have this role.

@@ -79,16 +79,16 @@
                 <div x-show="!isEdit" class="sm:col-span-2">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <span class="{{ $labelClass }}">PIC <span x-show="form.status === 'todo'" class="text-red-600">*</span></span>
-                        <label x-show="config.user.is_admin" class="flex items-center gap-2 text-xs text-slate-600">
+                        <label x-show="config.user.manages_all_divisions" class="flex items-center gap-2 text-xs text-slate-600">
                             <input type="checkbox" x-model="pics.allDivisions" @change="loadPics()" class="rounded border-burgundy-300 text-burgundy-600">
-                            Tampilkan Staff semua divisi
+                            Tampilkan PIC semua divisi
                         </label>
                     </div>
                     <div class="mt-1 max-h-40 overflow-y-auto rounded-lg border border-burgundy-200 p-2">
                         <p x-show="!form.division_id && !pics.allDivisions" class="px-1 py-2 text-xs text-slate-500">Pilih divisi terlebih dahulu.</p>
-                        <p x-show="pics.loading" class="px-1 py-2 text-xs text-slate-500">Memuat daftar Staff…</p>
+                        <p x-show="pics.loading" class="px-1 py-2 text-xs text-slate-500">Memuat daftar PIC…</p>
                         <p x-show="pics.error" class="px-1 py-2 text-xs text-red-600" x-text="pics.error"></p>
-                        <p x-show="!pics.loading && !pics.error && (form.division_id || pics.allDivisions) && pics.items.length === 0" class="px-1 py-2 text-xs text-slate-500">Tidak ada Staff aktif yang dapat ditugaskan.</p>
+                        <p x-show="!pics.loading && !pics.error && (form.division_id || pics.allDivisions) && pics.items.length === 0" class="px-1 py-2 text-xs text-slate-500">Tidak ada akun aktif yang dapat ditugaskan.</p>
                         <template x-for="pic in pics.items" :key="pic.id">
                             <label class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-burgundy-50">
                                 <input type="checkbox" :checked="form.pic_ids.includes(pic.id)" @change="togglePic(pic.id)" class="rounded border-burgundy-300 text-burgundy-600">

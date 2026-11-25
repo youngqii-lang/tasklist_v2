@@ -120,9 +120,18 @@ class TaskReviewTest extends TestCase
         $this->assertSame(Task::STATUS_ON_REVIEW, $this->task->fresh()->status);
     }
 
-    public function test_manager_cannot_review_tasks_of_another_division_but_admin_can(): void
+    public function test_supervisor_cannot_review_tasks_of_another_division(): void
     {
-        $this->decide(Account::factory()->manager()->create(), ['decision' => 'approved'])->assertForbidden();
+        $this->decide(Account::factory()->supervisor()->create(), ['decision' => 'approved'])->assertForbidden();
+    }
+
+    public function test_manager_can_review_tasks_of_any_division(): void
+    {
+        $this->decide(Account::factory()->manager()->create(), ['decision' => 'approved'])->assertOk();
+    }
+
+    public function test_admin_can_review_tasks_of_any_division(): void
+    {
         $this->decide(Account::factory()->admin()->create(), ['decision' => 'approved'])->assertOk();
     }
 
