@@ -29,9 +29,16 @@ class LoginTest extends TestCase
             ->assertSee('aria-label="Tampilkan password"', false);
     }
 
-    public function test_guest_is_redirected_to_login_from_dashboard(): void
+    public function test_guest_is_redirected_to_login_from_home(): void
     {
-        $this->get(route('dashboard'))->assertRedirect(route('login'));
+        $this->get(route('home'))->assertRedirect(route('login'));
+    }
+
+    public function test_home_redirects_to_the_tasklist(): void
+    {
+        $account = Account::factory()->create();
+
+        $this->actingAs($account)->get(route('home'))->assertRedirect(route('tasks.index'));
     }
 
     public function test_account_can_login_with_valid_username_and_password(): void
@@ -43,7 +50,7 @@ class LoginTest extends TestCase
             'password' => 'password',
         ]);
 
-        $response->assertRedirect(route('dashboard'));
+        $response->assertRedirect(route('tasks.index'));
         $this->assertAuthenticatedAs($account);
     }
 
@@ -61,7 +68,7 @@ class LoginTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_dashboard_greets_account_with_role_and_division(): void
+    public function test_sidebar_shows_role_and_division(): void
     {
         $account = Account::factory()
             ->for(Role::factory()->state(['name' => 'Manager']))
@@ -69,19 +76,19 @@ class LoginTest extends TestCase
             ->create(['fullname' => 'Budi Santoso']);
 
         $this->actingAs($account)
-            ->get(route('dashboard'))
+            ->get(route('tasks.index'))
             ->assertOk()
-            ->assertSee('Halo, Budi Santoso!')
+            ->assertSee('Budi Santoso')
             ->assertSee('Manager')
             ->assertSee('Keuangan');
     }
 
-    public function test_dashboard_renders_for_account_without_division(): void
+    public function test_sidebar_renders_for_account_without_division(): void
     {
         $account = Account::factory()->withoutDivision()->create();
 
         $this->actingAs($account)
-            ->get(route('dashboard'))
+            ->get(route('tasks.index'))
             ->assertOk()
             ->assertSee('Tanpa Divisi');
     }
@@ -91,9 +98,10 @@ class LoginTest extends TestCase
         $account = Account::factory()->create(['username' => 'budi']);
 
         $this->actingAs($account)
-            ->get(route('dashboard'))
+            ->get(route('tasks.index'))
             ->assertOk()
-            ->assertSee('href="'.route('dashboard').'"', false)
+            ->assertSee('href="'.route('tasks.index').'"', false)
+            ->assertDontSee('Dashboard')
             ->assertSee('aria-current="page"', false)
             ->assertSee('action="'.route('logout').'"', false)
             ->assertSee('src="'.asset('images/logo.png').'"', false)
@@ -116,7 +124,7 @@ class LoginTest extends TestCase
         $this->post(route('login.store'), [
             'username' => 'manager',
             'password' => 'password',
-        ])->assertRedirect(route('dashboard'));
+        ])->assertRedirect(route('tasks.index'));
 
         $manager = Account::where('username', 'manager')->first();
 

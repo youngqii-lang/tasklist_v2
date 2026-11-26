@@ -95,7 +95,7 @@ class TasklistPageTest extends TestCase
     {
         $staff = Account::factory()->employee()->for($this->division)->create();
 
-        $this->actingAs($staff)->get(route('dashboard'))->assertOk()->assertSee(route('tasks.index'));
+        $this->actingAs($staff)->get(route('accounts.index'))->assertOk()->assertSee(route('tasks.index'));
     }
 
     public function test_task_flags_tell_whether_the_user_manages_the_task(): void

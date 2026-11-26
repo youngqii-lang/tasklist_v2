@@ -36,7 +36,7 @@ class LoginController extends Controller
         $request->session()->regenerate();
 
         return redirect()
-            ->intended(route('dashboard'))
+            ->intended(route('tasks.index'))
             ->with('status', 'Berhasil masuk. Selamat datang, '.$request->user()->fullname.'.');
     }
 

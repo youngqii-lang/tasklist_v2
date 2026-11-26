@@ -263,7 +263,7 @@ class AccountManagementTest extends TestCase
         auth()->logout();
 
         $this->post(route('login.store'), ['username' => 'budi123', 'password' => 'rahasia123'])
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('tasks.index'));
         $this->assertAuthenticatedAs($account);
     }
 
