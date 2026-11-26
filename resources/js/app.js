@@ -4,6 +4,7 @@ import taskForm from './tasklist/task-form';
 import taskDetail from './tasklist/task-detail';
 import taskTimeline from './tasklist/timeline';
 import taskCalendar from './tasklist/calendar';
+import agendaForm from './tasklist/agenda-form';
 import toast from './toast';
 
 /**
@@ -108,6 +109,7 @@ Alpine.data('taskForm', taskForm);
 Alpine.data('taskDetail', taskDetail);
 Alpine.data('taskTimeline', taskTimeline);
 Alpine.data('taskCalendar', taskCalendar);
+Alpine.data('agendaForm', agendaForm);
 
 window.Alpine = Alpine;
 Alpine.start();

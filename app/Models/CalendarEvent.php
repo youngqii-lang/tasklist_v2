@@ -62,6 +62,35 @@ class CalendarEvent extends Model
     }
 
     /**
+     * The same rule as scopeVisibleTo(), for one agenda that is already loaded.
+     */
+    public function isVisibleTo(Account $account): bool
+    {
+        if (! $account->is_active) {
+            return false;
+        }
+
+        return $this->is_shared
+            || $account->isAdmin()
+            || ($account->division_id !== null && $this->targetDivisions->contains('id', $account->division_id));
+    }
+
+    /**
+     * Who may change or delete the agenda: Admin and Managers for every agenda they can see, a Supervisor only for
+     * the agendas their own division organises.
+     */
+    public function managedBy(Account $account): bool
+    {
+        if (! $this->isVisibleTo($account)) {
+            return false;
+        }
+
+        return $account->isAdmin()
+            || $account->isManager()
+            || ($account->isSupervisor() && $account->division_id !== null && $this->division_id === $account->division_id);
+    }
+
+    /**
      * Agendas that overlap the period; one without an end lasts its start day only.
      */
     public function scopeWithin(Builder $query, CarbonInterface $from, CarbonInterface $to): void

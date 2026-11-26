@@ -35,7 +35,7 @@
         <p x-show="!error" class="flex flex-wrap gap-x-4 gap-y-1 border-b border-burgundy-50 px-4 py-2 text-xs text-slate-500">
             <span>Bulan ini: <span class="font-semibold text-slate-700" x-text="monthSummary.deadlines"></span> deadline</span>
             <span x-show="monthSummary.overdue" class="font-semibold text-red-600" x-text="monthSummary.overdue + ' terlambat'"></span>
-            <span><span class="font-semibold text-slate-700" x-text="monthSummary.events"></span> agenda bersama</span>
+            <span><span class="font-semibold text-slate-700" x-text="monthSummary.events"></span> agenda</span>
         </p>
 
         <p x-show="!error && hasHiddenFilters" class="border-b border-burgundy-50 bg-amber-50 px-4 py-2 text-xs text-amber-800">Filter pencarian, prioritas, status, atau PIC Tasklist sedang diterapkan pada deadline. Gunakan Reset Filter untuk menampilkan semua.</p>
@@ -84,7 +84,7 @@
             <div class="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
                 <span class="flex items-center gap-1.5"><span class="rounded bg-burgundy-100 px-1 text-[10px] font-semibold text-burgundy-800">n</span> Deadline tugas</span>
                 <span class="flex items-center gap-1.5"><span class="rounded bg-red-100 px-1 text-[10px] font-semibold text-red-700">n</span> Ada yang terlambat</span>
-                <span class="flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-[#0c5963]"></span> Agenda bersama</span>
+                <span class="flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-[#0c5963]"></span> Agenda</span>
             </div>
         </div>
     </div>
@@ -93,14 +93,34 @@
         <h2 class="text-sm font-semibold text-slate-800 capitalize" x-text="selectedLabel"></h2>
 
         <section x-show="!error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
-            <h3 class="text-xs font-semibold tracking-wide text-[#0c5963] uppercase">Agenda Bersama</h3>
+            <div class="flex items-center justify-between gap-2">
+                <h3 class="text-xs font-semibold tracking-wide text-[#0c5963] uppercase">Agenda</h3>
+                <button
+                    x-show="config.agenda.can_create"
+                    type="button"
+                    @click="$dispatch('open-agenda-form', { event: null, date: selectedDate })"
+                    class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-[#0c5963] ring-1 ring-[#0c5963]/30 hover:bg-[#0c5963]/10"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="size-3.5"><path d="M12 5v14M5 12h14" /></svg>
+                    Tambah Agenda
+                </button>
+            </div>
             <p x-show="day.loading" class="py-3 text-sm text-slate-400">Memuat…</p>
-            <p x-show="!day.loading && day.events.length === 0" class="py-3 text-sm text-slate-400">Tidak ada agenda bersama pada tanggal ini.</p>
+            <p x-show="!day.loading && day.events.length === 0" class="py-3 text-sm text-slate-400">Tidak ada agenda pada tanggal ini.</p>
             <ul x-show="!day.loading" class="mt-2 space-y-2">
                 <template x-for="event in day.events" :key="event.id">
                     <li class="rounded-lg bg-[#0c5963]/5 p-3 ring-1 ring-[#0c5963]/15">
-                        <p class="text-sm font-semibold text-slate-800" x-text="event.title"></p>
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="text-sm font-semibold text-slate-800" x-text="event.title"></p>
+                            <button
+                                x-show="event.can_update"
+                                type="button"
+                                @click="$dispatch('open-agenda-form', { event })"
+                                class="shrink-0 rounded-md px-2 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-white"
+                            >Edit</button>
+                        </div>
                         <p class="text-xs text-slate-500" x-text="(event.division?.name ?? 'Semua Divisi') + ' · ' + (event.start === event.end ? formatDate(event.start) : formatDate(event.start) + ' – ' + formatDate(event.end))"></p>
+                        <p x-show="!event.is_shared" class="mt-1 text-[11px] font-medium text-amber-800" x-text="'Internal: ' + event.target_divisions.map((division) => division.name).join(', ')"></p>
                         <p x-show="event.description" class="mt-1 text-xs text-slate-700" x-text="event.description"></p>
                     </li>
                 </template>

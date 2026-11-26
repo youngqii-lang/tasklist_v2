@@ -33,14 +33,16 @@ class CalendarEventResource extends JsonResource
             // Agendas are not linked to tasks (ERD); the keys stay so the response shape is unchanged.
             'task_id' => null,
             'can_view_detail' => false,
+            'can_update' => $request->user()?->can('update', $this->resource) ?? false,
+            'can_delete' => $request->user()?->can('delete', $this->resource) ?? false,
         ];
     }
 
     /**
-     * @return array{code_division: string, name: string}
+     * @return array{id: int, code_division: string, name: string}
      */
     private function divisionData(Division $division): array
     {
-        return ['code_division' => $division->code_division, 'name' => $division->name];
+        return ['id' => $division->id, 'code_division' => $division->code_division, 'name' => $division->name];
     }
 }

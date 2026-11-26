@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Task\CalendarEventController;
 use App\Http\Controllers\Task\TaskController;
 use App\Http\Controllers\Task\TaskMonitoringController;
+use App\Models\CalendarEvent;
 use App\Models\Task;
 use Illuminate\Support\Facades\Route;
 
@@ -94,5 +96,19 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('task')
             ->can('assign', 'task')
             ->name('assign');
+    });
+
+    Route::prefix('agendas')->name('api.agendas.')->group(function () {
+        Route::post('/', [CalendarEventController::class, 'store'])
+            ->can('create', CalendarEvent::class)
+            ->name('store');
+        Route::match(['put', 'patch'], '/{calendarEvent}', [CalendarEventController::class, 'update'])
+            ->whereNumber('calendarEvent')
+            ->can('update', 'calendarEvent')
+            ->name('update');
+        Route::delete('/{calendarEvent}', [CalendarEventController::class, 'destroy'])
+            ->whereNumber('calendarEvent')
+            ->can('delete', 'calendarEvent')
+            ->name('destroy');
     });
 });

@@ -6,6 +6,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Http\Requests\Task\StoreTaskEvidenceRequest;
 use App\Models\Account;
+use App\Models\CalendarEvent;
 use App\Models\Division;
 use App\Models\Task;
 use Illuminate\Http\Request;
@@ -31,6 +32,12 @@ class TasklistController extends Controller
                     'manages_all_divisions' => $user->managesAllDivisions(),
                 ],
                 'can_create' => $user->can('create', Task::class),
+                'agenda' => [
+                    'can_create' => $user->can('create', CalendarEvent::class),
+                    'own_division_id' => $user->division_id,
+                    'is_admin' => $user->isAdmin(),
+                    'is_supervisor' => $user->isSupervisor(),
+                ],
                 'divisions' => Division::query()->orderBy('name')->get(['id', 'name']),
                 'pics' => Account::query()->assignableAsPic()->with('division')->orderBy('fullname')->get()
                     ->map(fn (Account $account) => [
@@ -47,6 +54,7 @@ class TasklistController extends Controller
                     'options' => route('api.tasks.create-options'),
                     'timeline' => route('api.tasks.schedule'),
                     'calendar' => route('api.tasks.calendar'),
+                    'agendas' => route('api.agendas.store'),
                 ],
                 'evidence' => [
                     'extensions' => StoreTaskEvidenceRequest::MIMES,

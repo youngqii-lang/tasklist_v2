@@ -85,13 +85,13 @@
         </template>
 
         <template x-if="view === 'timeline'">
-            <div x-data="taskTimeline(config, filters)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
+            <div x-data="taskTimeline(config, filters)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()" @agendas-changed.window="load()">
                 @include('tasks.partials.timeline')
             </div>
         </template>
 
         <template x-if="view === 'calendar'">
-            <div x-data="taskCalendar(config, filters)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
+            <div x-data="taskCalendar(config, filters)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()" @agendas-changed.window="load()">
                 @include('tasks.partials.calendar')
             </div>
         </template>
@@ -99,5 +99,6 @@
         @include('tasks.partials.revision-dialog')
         @include('tasks.partials.task-form')
         @include('tasks.partials.task-detail')
+        @include('tasks.partials.agenda-form')
     </div>
 @endsection

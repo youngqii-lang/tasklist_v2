@@ -26,7 +26,7 @@
 
     <p x-show="!loading && !error && !isEmpty" class="flex flex-wrap gap-x-4 gap-y-1 border-b border-burgundy-50 px-4 py-2 text-xs text-slate-500">
         <span><span class="font-semibold text-slate-700" x-text="visibleTasks.length"></span> tugas</span>
-        <span><span class="font-semibold text-slate-700" x-text="events.length"></span> agenda bersama</span>
+        <span><span class="font-semibold text-slate-700" x-text="events.length"></span> agenda</span>
         <span x-show="overdueCount" class="font-semibold text-red-600" x-text="overdueCount + ' terlambat'"></span>
     </p>
 
@@ -67,7 +67,7 @@
             <p x-show="!loading && isEmpty" class="relative py-10 text-center text-sm text-slate-500">Tidak ada jadwal pada periode ini.</p>
 
             <div x-show="!loading && events.length" class="relative mt-3">
-                <h3 class="mb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">Agenda Bersama</h3>
+                <h3 class="mb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">Agenda</h3>
                 <div class="space-y-1">
                     <template x-for="(lane, laneIndex) in eventLanes" :key="'event-lane-' + laneIndex">
                         <div class="grid gap-1" :style="gridStyle">
