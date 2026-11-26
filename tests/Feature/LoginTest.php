@@ -12,12 +12,13 @@ class LoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_login_page_shows_welcome_message(): void
+    public function test_login_page_shows_app_heading(): void
     {
         $response = $this->get(route('login'));
 
         $response->assertOk();
-        $response->assertSee('Selamat datang');
+        $response->assertSee('CereList');
+        $response->assertSee('Masuk untuk melanjutkan');
         $response->assertSee('src="'.asset('images/logo.png').'"', false);
     }
 
