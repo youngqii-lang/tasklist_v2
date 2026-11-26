@@ -11,8 +11,8 @@
                     height="80"
                     class="mx-auto mb-4 size-20 rounded-2xl bg-[#f7f7f7] object-contain p-1 shadow-lg shadow-black/25 ring-1 ring-white/15"
                 >
-                <h1 class="text-2xl font-semibold">Selamat datang 👋</h1>
-                <p class="mt-2 text-sm text-burgundy-100">Silakan masuk untuk mengelola daftar tugasmu hari ini.</p>
+                <h1 class="text-2xl font-semibold">CereList</h1>
+                <p class="mt-2 text-sm text-burgundy-100">Masuk untuk melanjutkan</p>
             </div>
 
             <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-5 p-6">
