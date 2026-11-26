@@ -24,17 +24,8 @@
     <nav class="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-2">
         <div>
             <p class="mb-2 px-3 text-xs font-medium text-burgundy-300">Utama</p>
-            <x-sidebar-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0">
-                    <rect x="3" y="3" width="7" height="9" rx="1.5" />
-                    <rect x="14" y="3" width="7" height="5" rx="1.5" />
-                    <rect x="14" y="12" width="7" height="9" rx="1.5" />
-                    <rect x="3" y="16" width="7" height="5" rx="1.5" />
-                </svg>
-                Dashboard
-            </x-sidebar-link>
             @can('viewAny', App\Models\Task::class)
-                <x-sidebar-link :href="route('tasks.index')" :active="request()->routeIs('tasks.*')" class="mt-1">
+                <x-sidebar-link :href="route('tasks.index')" :active="request()->routeIs('tasks.*')">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="size-5 shrink-0">
                         <path d="M9 11l3 3 8-8" />
                         <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />

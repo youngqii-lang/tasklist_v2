@@ -12,7 +12,7 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::view('/', 'dashboard')->name('dashboard');
+    Route::get('/', fn () => to_route('tasks.index'))->name('home');
     Route::get('/tasks', TasklistController::class)->name('tasks.index');
     Route::resource('accounts', AccountController::class)->except('show');
     Route::resource('divisions', DivisionController::class)->except('show');
