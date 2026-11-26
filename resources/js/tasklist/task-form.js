@@ -1,5 +1,6 @@
 import Alpine from 'alpinejs';
 import { http } from '../http';
+import { normalizeTask } from './contract';
 
 const emptyForm = () => ({
     title: '',
@@ -13,12 +14,18 @@ const emptyForm = () => ({
     start_date: '',
     deadline: '',
     requires_review: false,
+    evidence_required: false,
 });
 
 const nullable = (value) => (value === '' || value === undefined ? null : value);
+const toId = (value) => (value === '' || value === null || value === undefined ? null : Number(value));
+
+/** Fields of the edit form, as the API names them in editable_fields. */
+const EDIT_FIELDS = ['title', 'description', 'category_id', 'division_id', 'platform_id', 'priority', 'start_date', 'deadline', 'requires_review'];
 
 /**
- * Create and edit dialog. The fields shown follow the abilities the API returns for the task.
+ * Create and edit dialog. Options come from GET /api/tasks/create-options; on edit the fields shown and sent follow
+ * the task's editable_fields from the API.
  */
 export default (config) => ({
     config,
@@ -34,23 +41,43 @@ export default (config) => ({
     options: null,
     optionsLoading: false,
     optionsError: null,
-    pics: { items: [], loading: false, error: null, allDivisions: false },
+    showAllPics: false,
+    picQuery: '',
 
     get isEdit() {
         return this.editing;
     },
 
-    /** Admins and division managers may change everything; a PIC only the work details. */
+    /** Whether the field can be changed: always on create, on edit only when the API lists it. */
+    canEdit(field) {
+        return !this.isEdit || Boolean(this.task?.abilities.editable_fields.includes(field));
+    },
+
+    /** Admins and division managers change the task's details; others see them read-only. */
     get canManage() {
         return !this.isEdit || Boolean(this.task?.abilities.manage);
     },
 
     get canChangeDivision() {
-        return !this.isEdit || this.config.user.manages_all_divisions;
+        return this.canEdit('division_id');
     },
 
     get selectedCategory() {
         return this.options?.categories.find((category) => String(category.id) === String(this.form.category_id)) ?? null;
+    },
+
+    /** PIC choices: the chosen division's accounts (or all), matching the search, with the chosen ones first. */
+    get picChoices() {
+        const query = this.picQuery.trim().toLowerCase();
+        const chosen = this.form.pic_ids;
+        const items = (this.options?.pics ?? []).filter((pic) => {
+            const inDivision = this.showAllPics || String(pic.division?.id ?? '') === String(this.form.division_id);
+            const matches = !query || pic.fullname.toLowerCase().includes(query) || (pic.division?.name ?? '').toLowerCase().includes(query);
+
+            return (inDivision || chosen.includes(pic.id)) && matches;
+        });
+
+        return items.sort((a, b) => Number(chosen.includes(b.id)) - Number(chosen.includes(a.id)));
     },
 
     /** Edits always start from the full, latest task so no field is cleared and the version is current. */
@@ -62,7 +89,8 @@ export default (config) => ({
         this.generalError = null;
         this.saving = false;
         this.loadingTask = Boolean(task);
-        this.pics = { items: [], loading: false, error: null, allDivisions: false };
+        this.showAllPics = false;
+        this.picQuery = '';
         this.form = emptyForm();
         this.open = true;
 
@@ -73,8 +101,8 @@ export default (config) => ({
             ]);
 
             if (fullTask) {
-                this.task = fullTask;
-                this.form = this.fromTask(fullTask);
+                this.task = normalizeTask(fullTask, this.config.user.id);
+                this.form = this.fromTask(this.task);
             }
         } catch (error) {
             this.generalError = error.message;
@@ -85,11 +113,12 @@ export default (config) => ({
             this.loadingTask = false;
         }
 
-        if (!task && this.options?.divisions.length === 1) {
-            this.form.division_id = String(this.options.divisions[0].id);
-        }
+        if (!task && this.options) {
+            this.form.priority = this.options.defaults?.priority ?? 'medium';
+            this.form.status = this.options.defaults?.status ?? 'backlog';
 
-        if (!task && this.form.division_id) this.loadPics();
+            if (this.options.divisions.length === 1) this.form.division_id = String(this.options.divisions[0].id);
+        }
 
         this.$nextTick(() => this.$refs.title?.focus());
     },
@@ -104,17 +133,18 @@ export default (config) => ({
             title: task.title,
             description: task.description ?? '',
             category_id: task.category ? String(task.category.id) : '',
-            division_id: task.division ? String(task.division.id) : '',
+            division_id: task.division?.id ? String(task.division.id) : '',
             platform_id: task.platform ? String(task.platform.id) : '',
             priority: task.priority,
             status: task.status,
             start_date: task.start_date ?? '',
             deadline: task.deadline ?? '',
             requires_review: Boolean(task.requires_review),
+            evidence_required: Boolean(task.evidence_required),
         };
     },
 
-    /** The master data endpoint is open to task creators only; a PIC edits without the option lists. */
+    /** The options endpoint is open to task creators only; anyone else edits without the option lists. */
     async loadOptions() {
         if (this.options || !this.config.can_create) return;
 
@@ -130,41 +160,22 @@ export default (config) => ({
         }
     },
 
+    /** The category decides whether review (and evidence) is required. */
     onCategoryChange() {
-        if (this.selectedCategory) {
-            this.form.requires_review = this.selectedCategory.requires_review;
-        }
+        if (!this.selectedCategory) return;
+
+        this.form.requires_review = Boolean(this.selectedCategory.requires_review);
+        if (this.selectedCategory.evidence_required) this.form.evidence_required = true;
     },
 
+    /** PICs outside the new division are dropped unless the user chose to see every division. */
     onDivisionChange() {
-        if (!this.pics.allDivisions) this.form.pic_ids = [];
-        this.loadPics();
-    },
+        if (this.showAllPics) return;
 
-    async loadPics() {
-        const allDivisions = this.config.user.manages_all_divisions && this.pics.allDivisions;
-
-        if (!allDivisions && !this.form.division_id) {
-            this.pics.items = [];
-
-            return;
-        }
-
-        this.pics.loading = true;
-        this.pics.error = null;
-
-        try {
-            const response = await http(this.config.urls.pics, {
-                query: { division_id: allDivisions ? '' : this.form.division_id },
-            });
-            this.pics.items = response.data;
-            const available = response.data.map((pic) => pic.id);
-            this.form.pic_ids = this.form.pic_ids.filter((id) => available.includes(id));
-        } catch (error) {
-            this.pics.error = error.message;
-        } finally {
-            this.pics.loading = false;
-        }
+        const inDivision = (this.options?.pics ?? [])
+            .filter((pic) => String(pic.division?.id ?? '') === String(this.form.division_id))
+            .map((pic) => pic.id);
+        this.form.pic_ids = this.form.pic_ids.filter((id) => inDivision.includes(id));
     },
 
     togglePic(id) {
@@ -173,36 +184,48 @@ export default (config) => ({
             : [...this.form.pic_ids, id];
     },
 
-    payload() {
-        const common = {
+    createPayload() {
+        return {
             title: this.form.title.trim(),
             description: nullable(this.form.description),
+            category_id: toId(this.form.category_id),
+            division_id: toId(this.form.division_id),
+            platform_id: toId(this.form.platform_id),
+            pic_ids: this.form.pic_ids,
+            priority: this.form.priority,
+            status: this.form.status,
+            start_date: nullable(this.form.start_date),
+            deadline: nullable(this.form.deadline),
+            requires_review: this.form.requires_review,
+            evidence_required: this.form.evidence_required,
+        };
+    },
+
+    /** Only the fields the API allows this user to change are sent, with the version that was loaded. */
+    editPayload() {
+        const values = {
+            title: this.form.title.trim(),
+            description: nullable(this.form.description),
+            category_id: toId(this.form.category_id),
+            division_id: toId(this.form.division_id),
+            platform_id: toId(this.form.platform_id),
             priority: this.form.priority,
             start_date: nullable(this.form.start_date),
             deadline: nullable(this.form.deadline),
+            requires_review: this.form.requires_review,
         };
+        const payload = { version: this.task.version };
 
-        if (this.options) common.platform_id = nullable(this.form.platform_id);
+        EDIT_FIELDS.filter((field) => this.canEdit(field)).forEach((field) => {
+            payload[field] = values[field];
+        });
 
-        if (!this.isEdit) {
-            return {
-                ...common,
-                division_id: nullable(this.form.division_id),
-                category_id: nullable(this.form.category_id),
-                requires_review: this.form.requires_review,
-                status: this.form.status,
-                pic_ids: this.form.pic_ids,
-            };
+        // Option lists are only loaded for task creators; without them these fields keep their stored value.
+        if (!this.options) {
+            delete payload.category_id;
+            delete payload.platform_id;
+            delete payload.division_id;
         }
-
-        const payload = { ...common, version: this.task.version };
-
-        if (this.canManage) {
-            payload.category_id = nullable(this.form.category_id);
-            payload.requires_review = this.form.requires_review;
-        }
-
-        if (this.canManage && this.canChangeDivision) payload.division_id = nullable(this.form.division_id);
 
         return payload;
     },
@@ -216,8 +239,8 @@ export default (config) => ({
 
         try {
             const response = this.isEdit
-                ? await http(`${this.config.urls.tasks}/${this.task.id}`, { method: 'PATCH', body: this.payload() })
-                : await http(this.config.urls.tasks, { method: 'POST', body: this.payload() });
+                ? await http(`${this.config.urls.tasks}/${this.task.id}`, { method: 'PATCH', body: this.editPayload() })
+                : await http(this.config.urls.tasks, { method: 'POST', body: this.createPayload() });
 
             Alpine.store('toast').success(response.message);
             this.$dispatch('tasks-changed', { id: response.data.id });
@@ -225,9 +248,13 @@ export default (config) => ({
             this.open = false;
         } catch (error) {
             this.errors = error.errors;
-            this.generalError = Object.keys(this.errors).length ? 'Periksa kembali isian yang ditandai.' : error.message;
+            this.generalError = error.status === 409
+                ? error.message
+                : (Object.keys(this.errors).length ? 'Periksa kembali isian yang ditandai.' : error.message);
             Alpine.store('toast').failure(error);
             this.saving = false;
+
+            if (error.status === 409) this.$dispatch('tasks-changed', { id: this.task?.id });
         }
     },
 

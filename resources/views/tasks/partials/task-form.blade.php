@@ -46,7 +46,7 @@
 
                 <div>
                     <label for="form-category" class="{{ $labelClass }}">Kategori/Jenis Tugas</label>
-                    <template x-if="options && canManage">
+                    <template x-if="options && canEdit('category_id')">
                         <select id="form-category" x-model="form.category_id" @change="onCategoryChange()" class="{{ $fieldClass }}">
                             <option value="">Tanpa kategori</option>
                             <template x-for="category in options.categories" :key="category.id">
@@ -54,7 +54,7 @@
                             </template>
                         </select>
                     </template>
-                    <template x-if="!(options && canManage)">
+                    <template x-if="!(options && canEdit('category_id'))">
                         <p class="{{ $fieldClass }} bg-slate-50 text-slate-500" x-text="task?.category?.name ?? 'Tanpa kategori'"></p>
                     </template>
                     <p x-show="error('category_id')" x-text="error('category_id')" class="mt-1 text-xs text-red-600"></p>
@@ -62,7 +62,7 @@
 
                 <div>
                     <label for="form-division" class="{{ $labelClass }}">Target Divisi <span class="text-red-600">*</span></label>
-                    <template x-if="options && canManage && canChangeDivision">
+                    <template x-if="options && canChangeDivision">
                         <select id="form-division" x-model="form.division_id" @change="onDivisionChange()" class="{{ $fieldClass }}" :aria-invalid="!!error('division_id')">
                             <option value="">Pilih divisi</option>
                             <template x-for="division in options.divisions" :key="division.id">
@@ -70,7 +70,7 @@
                             </template>
                         </select>
                     </template>
-                    <template x-if="!(options && canManage && canChangeDivision)">
+                    <template x-if="!(options && canChangeDivision)">
                         <p class="{{ $fieldClass }} bg-slate-50 text-slate-500" x-text="task?.division?.name ?? '—'"></p>
                     </template>
                     <p x-show="error('division_id')" x-text="error('division_id')" class="mt-1 text-xs text-red-600"></p>
@@ -79,24 +79,24 @@
                 <div x-show="!isEdit" class="sm:col-span-2">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <span class="{{ $labelClass }}">PIC <span x-show="form.status === 'todo'" class="text-red-600">*</span></span>
-                        <label x-show="config.user.manages_all_divisions" class="flex items-center gap-2 text-xs text-slate-600">
-                            <input type="checkbox" x-model="pics.allDivisions" @change="loadPics()" class="rounded border-burgundy-300 text-burgundy-600">
+                        <label class="flex items-center gap-2 text-xs text-slate-600">
+                            <input type="checkbox" x-model="showAllPics" class="rounded border-burgundy-300 text-burgundy-600">
                             Tampilkan PIC semua divisi
                         </label>
                     </div>
+                    <input type="search" x-model="picQuery" placeholder="Cari nama atau divisi…" aria-label="Cari PIC" class="{{ $fieldClass }}">
                     <div class="mt-1 max-h-40 overflow-y-auto rounded-lg border border-burgundy-200 p-2">
-                        <p x-show="!form.division_id && !pics.allDivisions" class="px-1 py-2 text-xs text-slate-500">Pilih divisi terlebih dahulu.</p>
-                        <p x-show="pics.loading" class="px-1 py-2 text-xs text-slate-500">Memuat daftar PIC…</p>
-                        <p x-show="pics.error" class="px-1 py-2 text-xs text-red-600" x-text="pics.error"></p>
-                        <p x-show="!pics.loading && !pics.error && (form.division_id || pics.allDivisions) && pics.items.length === 0" class="px-1 py-2 text-xs text-slate-500">Tidak ada akun aktif yang dapat ditugaskan.</p>
-                        <template x-for="pic in pics.items" :key="pic.id">
+                        <p x-show="!form.division_id && !showAllPics" class="px-1 py-2 text-xs text-slate-500">Pilih divisi terlebih dahulu.</p>
+                        <p x-show="(form.division_id || showAllPics) && picChoices.length === 0" class="px-1 py-2 text-xs text-slate-500">Tidak ada akun yang dapat ditugaskan.</p>
+                        <template x-for="pic in picChoices" :key="pic.id">
                             <label class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-burgundy-50">
                                 <input type="checkbox" :checked="form.pic_ids.includes(pic.id)" @change="togglePic(pic.id)" class="rounded border-burgundy-300 text-burgundy-600">
                                 <span x-text="pic.fullname"></span>
-                                <span class="text-xs text-slate-400" x-text="pics.allDivisions ? (pic.division?.name ?? '') : '@' + pic.username"></span>
+                                <span class="text-xs text-slate-400" x-text="pic.division?.name ?? 'Tanpa divisi'"></span>
                             </label>
                         </template>
                     </div>
+                    <p class="mt-1 text-xs text-slate-500" x-show="form.pic_ids.length" x-text="form.pic_ids.length + ' PIC dipilih'"></p>
                     <p x-show="error('pic_ids')" x-text="error('pic_ids')" class="mt-1 text-xs text-red-600"></p>
                 </div>
 
@@ -130,7 +130,7 @@
                         </label>
                         <label class="flex cursor-pointer items-start gap-2 rounded-lg p-3 ring-1" :class="form.status === 'todo' ? 'bg-burgundy-50 ring-burgundy-400' : 'ring-burgundy-200'">
                             <input type="radio" value="todo" x-model="form.status" class="mt-0.5 text-burgundy-600">
-                            <span class="text-sm"><span class="font-medium">To Do</span><span class="block text-xs text-slate-500">Siap dikerjakan, wajib PIC dan deadline.</span></span>
+                            <span class="text-sm"><span class="font-medium">To Do</span><span class="block text-xs text-slate-500">Siap dikerjakan, wajib minimal satu PIC.</span></span>
                         </label>
                     </div>
                     <p x-show="error('status')" x-text="error('status')" class="mt-1 text-xs text-red-600"></p>
@@ -143,14 +143,14 @@
                 </div>
 
                 <div>
-                    <label for="form-deadline" class="{{ $labelClass }}">Deadline <span x-show="form.status !== 'backlog'" class="text-red-600">*</span></label>
+                    <label for="form-deadline" class="{{ $labelClass }}">Deadline</label>
                     <input id="form-deadline" type="date" x-model="form.deadline" :min="form.start_date || null" class="{{ $fieldClass }}" :aria-invalid="!!error('deadline')">
                     <p x-show="error('deadline')" x-text="error('deadline')" class="mt-1 text-xs text-red-600"></p>
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="flex items-start gap-3 rounded-lg p-3 ring-1 ring-burgundy-200" :class="!canManage && 'opacity-60'">
-                        <input type="checkbox" x-model="form.requires_review" :disabled="!canManage" class="mt-0.5 rounded border-burgundy-300 text-burgundy-600">
+                    <label class="flex items-start gap-3 rounded-lg p-3 ring-1 ring-burgundy-200" :class="!canEdit('requires_review') && 'opacity-60'">
+                        <input type="checkbox" x-model="form.requires_review" :disabled="!canEdit('requires_review')" class="mt-0.5 rounded border-burgundy-300 text-burgundy-600">
                         <span class="text-sm">
                             <span class="font-medium text-slate-800">Kewajiban QA</span>
                             <span class="block text-xs text-slate-500">
@@ -160,6 +160,20 @@
                         </span>
                     </label>
                     <p x-show="error('requires_review')" x-text="error('requires_review')" class="mt-1 text-xs text-red-600"></p>
+                </div>
+
+                <div x-show="!isEdit" class="sm:col-span-2">
+                    <label class="flex items-start gap-3 rounded-lg p-3 ring-1 ring-burgundy-200" :class="selectedCategory?.evidence_required && 'opacity-60'">
+                        <input type="checkbox" x-model="form.evidence_required" :disabled="selectedCategory?.evidence_required" class="mt-0.5 rounded border-burgundy-300 text-burgundy-600">
+                        <span class="text-sm">
+                            <span class="font-medium text-slate-800">Wajib Evidence</span>
+                            <span class="block text-xs text-slate-500">
+                                PIC harus melampirkan evidence sebelum mengirim atau menyelesaikan tugas.
+                                <span x-show="selectedCategory?.evidence_required" x-text="'Diwajibkan oleh kategori ' + (selectedCategory?.name ?? '') + '.'"></span>
+                            </span>
+                        </span>
+                    </label>
+                    <p x-show="error('evidence_required')" x-text="error('evidence_required')" class="mt-1 text-xs text-red-600"></p>
                 </div>
             </div>
 

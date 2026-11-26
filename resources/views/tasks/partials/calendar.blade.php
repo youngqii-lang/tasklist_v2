@@ -1,7 +1,20 @@
 <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" aria-label="Calendar View">
     <div class="rounded-2xl bg-white shadow-sm ring-1 ring-burgundy-100">
         <header class="flex flex-wrap items-center justify-between gap-3 border-b border-burgundy-100 px-4 py-3">
-            <p class="text-base font-semibold text-slate-800 capitalize" x-text="monthLabel"></p>
+            <div class="flex items-center gap-2">
+                <label for="calendar-month" class="sr-only">Bulan</label>
+                <select id="calendar-month" @change="jumpToMonth($event.target.value, month.getFullYear())" class="rounded-lg border border-burgundy-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800">
+                    <template x-for="(name, index) in monthNames" :key="index">
+                        <option :value="index" x-text="name" :selected="index === month.getMonth()"></option>
+                    </template>
+                </select>
+                <label for="calendar-year" class="sr-only">Tahun</label>
+                <select id="calendar-year" @change="jumpToMonth(month.getMonth(), $event.target.value)" class="rounded-lg border border-burgundy-200 bg-white px-2 py-1.5 text-sm font-semibold text-slate-800">
+                    <template x-for="year in yearOptions" :key="year">
+                        <option :value="year" x-text="year" :selected="year === month.getFullYear()"></option>
+                    </template>
+                </select>
+            </div>
             <div class="flex items-center gap-2">
                 <button type="button" @click="shiftMonth(-1)" class="rounded-lg p-2 ring-1 ring-burgundy-200 hover:bg-burgundy-50" aria-label="Bulan sebelumnya">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="size-4"><path d="m15 18-6-6 6-6" /></svg>
@@ -19,33 +32,50 @@
             <button type="button" @click="load()" class="rounded-lg bg-burgundy-600 px-4 py-2 text-sm font-semibold text-white hover:bg-burgundy-700">Coba lagi</button>
         </div>
 
+        <p x-show="!error" class="flex flex-wrap gap-x-4 gap-y-1 border-b border-burgundy-50 px-4 py-2 text-xs text-slate-500">
+            <span>Bulan ini: <span class="font-semibold text-slate-700" x-text="monthSummary.deadlines"></span> deadline</span>
+            <span x-show="monthSummary.overdue" class="font-semibold text-red-600" x-text="monthSummary.overdue + ' terlambat'"></span>
+            <span><span class="font-semibold text-slate-700" x-text="monthSummary.events"></span> agenda bersama</span>
+        </p>
+
+        <p x-show="!error && hasHiddenFilters" class="border-b border-burgundy-50 bg-amber-50 px-4 py-2 text-xs text-amber-800">Filter pencarian, prioritas, status, atau PIC Tasklist sedang diterapkan pada deadline. Gunakan Reset Filter untuk menampilkan semua.</p>
+
         <div x-show="!error" class="p-3" :aria-busy="loading" :class="loading && 'opacity-60'">
             <div class="grid grid-cols-7 gap-1 pb-1 text-center text-[11px] font-semibold text-slate-500 uppercase">
                 <template x-for="weekday in weekdays" :key="weekday"><div x-text="weekday"></div></template>
             </div>
-            <div class="grid grid-cols-7 gap-1" role="grid">
+            <div class="grid grid-cols-7 gap-1" role="grid" aria-label="Kalender, gunakan tombol panah untuk berpindah tanggal" @keydown="onGridKeydown($event)">
                 <template x-for="cell in cells" :key="cell.key">
                     <button
                         type="button"
                         role="gridcell"
+                        :data-date="cell.key"
+                        :tabindex="cell.key === selectedDate ? 0 : -1"
                         @click="selectDate(cell.key)"
                         :aria-selected="cell.key === selectedDate"
                         :aria-label="cell.key + (cell.deadline ? ', ' + cell.deadline.total + ' deadline' : '') + (cell.events.length ? ', ' + cell.events.length + ' agenda' : '')"
-                        class="flex min-h-14 flex-col items-stretch rounded-lg p-1 text-left transition sm:min-h-20 sm:p-1.5"
+                        class="flex min-h-14 min-w-0 flex-col items-stretch rounded-lg p-1 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-burgundy-500 sm:min-h-20 sm:p-1.5 xl:min-h-24"
                         :class="[
-                            cell.key === selectedDate ? 'bg-burgundy-600 text-white ring-2 ring-burgundy-300' : (cell.inMonth ? 'bg-white ring-1 ring-burgundy-100 hover:bg-burgundy-50' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100'),
+                            cell.key === selectedDate
+                                ? 'bg-burgundy-600 text-white ring-2 ring-burgundy-300'
+                                : (cell.inMonth ? (cell.isWeekend ? 'bg-slate-50 ring-1 ring-burgundy-100 hover:bg-burgundy-50' : 'bg-white ring-1 ring-burgundy-100 hover:bg-burgundy-50') : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100'),
                         ]"
                     >
                         <span class="text-xs font-semibold" :class="cell.isToday && cell.key !== selectedDate && 'flex size-5 items-center justify-center rounded-full bg-burgundy-100 text-burgundy-800'" x-text="cell.day"></span>
+                        <span class="mt-1 hidden min-w-0 flex-col gap-0.5 lg:flex">
+                            <template x-for="event in cell.events.slice(0, 2)" :key="'t-' + event.id">
+                                <span class="truncate rounded px-1 text-[10px] leading-4" :class="cell.key === selectedDate ? 'bg-white/20 text-white' : 'bg-[#0c5963]/10 text-[#0c5963]'" x-text="event.title"></span>
+                            </template>
+                            <span x-show="cell.events.length > 2" class="text-[10px] leading-4 opacity-70" x-text="'+' + (cell.events.length - 2) + ' agenda'"></span>
+                        </span>
                         <span class="mt-auto flex flex-wrap items-center gap-1">
                             <span
                                 x-show="cell.deadline"
                                 class="rounded px-1 text-[10px] font-semibold"
                                 :class="cell.key === selectedDate ? 'bg-white/20 text-white' : (cell.deadline?.overdue ? 'bg-red-100 text-red-700' : 'bg-burgundy-100 text-burgundy-800')"
-                                x-text="cell.deadline?.total"
-                            ></span>
+                            ><span x-text="cell.deadline?.total"></span><span class="hidden sm:inline"> deadline</span></span>
                             <template x-for="event in cell.events.slice(0, 3)" :key="event.id">
-                                <span class="size-1.5 rounded-full" :class="cell.key === selectedDate ? 'bg-white' : 'bg-[#0c5963]'"></span>
+                                <span class="size-1.5 rounded-full lg:hidden" :class="cell.key === selectedDate ? 'bg-white' : 'bg-[#0c5963]'"></span>
                             </template>
                         </span>
                     </button>
@@ -62,12 +92,7 @@
     <div class="space-y-4">
         <h2 class="text-sm font-semibold text-slate-800 capitalize" x-text="selectedLabel"></h2>
 
-        <div x-show="day.error" class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200" role="alert">
-            <span x-text="day.error"></span>
-            <button type="button" @click="loadDay()" class="ml-1 font-semibold underline">Coba lagi</button>
-        </div>
-
-        <section x-show="!day.error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
+        <section x-show="!error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
             <h3 class="text-xs font-semibold tracking-wide text-[#0c5963] uppercase">Agenda Bersama</h3>
             <p x-show="day.loading" class="py-3 text-sm text-slate-400">Memuat…</p>
             <p x-show="!day.loading && day.events.length === 0" class="py-3 text-sm text-slate-400">Tidak ada agenda bersama pada tanggal ini.</p>
@@ -75,15 +100,18 @@
                 <template x-for="event in day.events" :key="event.id">
                     <li class="rounded-lg bg-[#0c5963]/5 p-3 ring-1 ring-[#0c5963]/15">
                         <p class="text-sm font-semibold text-slate-800" x-text="event.title"></p>
-                        <p class="text-xs text-slate-500" x-text="(event.division?.name ?? 'Semua Divisi') + ' · ' + (event.start === event.end ? eventTime(event) : formatDate(event.start) + ' – ' + formatDate(event.end))"></p>
+                        <p class="text-xs text-slate-500" x-text="(event.division?.name ?? 'Semua Divisi') + ' · ' + (event.start === event.end ? formatDate(event.start) : formatDate(event.start) + ' – ' + formatDate(event.end))"></p>
                         <p x-show="event.description" class="mt-1 text-xs text-slate-700" x-text="event.description"></p>
                     </li>
                 </template>
             </ul>
         </section>
 
-        <section x-show="!day.error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
-            <h3 class="text-xs font-semibold tracking-wide text-burgundy-700 uppercase">Deadline Tugas</h3>
+        <section x-show="!error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
+            <div class="flex items-center justify-between gap-2">
+                <h3 class="text-xs font-semibold tracking-wide text-burgundy-700 uppercase">Deadline Tugas</h3>
+                <button x-show="!day.loading && day.deadlines.length" type="button" @click="showInTable()" class="text-xs font-semibold text-burgundy-700 hover:underline">Lihat di Table →</button>
+            </div>
             <p x-show="day.loading" class="py-3 text-sm text-slate-400">Memuat…</p>
             <p x-show="!day.loading && day.deadlines.length === 0" class="py-3 text-sm text-slate-500">Tidak ada deadline tugas pada tanggal ini.</p>
             <ul x-show="!day.loading" class="mt-2 divide-y divide-burgundy-50">

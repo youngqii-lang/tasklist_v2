@@ -10,6 +10,9 @@
         @pointercancel.window="cancelDrag()"
         @blur.window="cancelDrag()"
         @keydown.escape.window="cancelDrag()"
+        x-on:show-deadlines-in-table.window="showDeadlinesInTable($event.detail.date)"
+        @scroll.window.passive="tableMenu.task && closeTableMenu()"
+        @resize.window="tableMenu.task && closeTableMenu()"
         class="mx-auto max-w-7xl"
     >
         <div class="flex flex-wrap items-end justify-between gap-4">
@@ -48,7 +51,7 @@
 
         <div class="mt-4 flex flex-wrap items-center gap-3">
             <div class="inline-flex rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-burgundy-100" role="group" aria-label="Cakupan tugas">
-                @foreach (['' => 'Semua Tugas', 'mine' => 'Tugas Saya'] as $scope => $label)
+                @foreach (['' => 'Semua Tugas', 'my_tasks' => 'Tugas Saya'] as $scope => $label)
                     <button
                         type="button"
                         @click="setScope('{{ $scope }}')"
@@ -82,13 +85,13 @@
         </template>
 
         <template x-if="view === 'timeline'">
-            <div x-data="taskTimeline(config, filters.division_id, filters.scope)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
+            <div x-data="taskTimeline(config, filters)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
                 @include('tasks.partials.timeline')
             </div>
         </template>
 
         <template x-if="view === 'calendar'">
-            <div x-data="taskCalendar(config, filters.division_id, filters.scope)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
+            <div x-data="taskCalendar(config, filters)" @tasklist-filters-changed.window="onFiltersChanged($event.detail.filters)" @tasks-changed.window="load()">
                 @include('tasks.partials.calendar')
             </div>
         </template>

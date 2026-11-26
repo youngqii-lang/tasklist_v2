@@ -7,10 +7,6 @@
 
     <div x-show="!board.error && !board.loading && board.total === 0" x-cloak class="rounded-2xl bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm ring-1 ring-burgundy-100" x-text="emptyMessage"></div>
 
-    <p x-show="!board.error && board.total > board.tasks.length" x-cloak class="mb-3 rounded-lg bg-amber-50 px-4 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
-        Menampilkan <span x-text="board.tasks.length"></span> dari <span x-text="board.total"></span> tugas. Gunakan filter atau Table View untuk melihat semuanya.
-    </p>
-
     <p x-show="!board.error && board.total > 0" class="mb-3 flex items-center gap-2 text-xs text-slate-500">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 shrink-0 text-slate-400"><circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" /><circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" /><circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" /></svg>
         <span class="hidden sm:inline">Seret kartu bertanda titik ke kolom yang menyala hijau, atau gunakan tombol <strong class="font-semibold">Pindahkan</strong> pada kartu. Tekan Esc untuk membatalkan.</span>

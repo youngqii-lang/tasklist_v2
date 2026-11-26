@@ -26,10 +26,10 @@
 
         <div :class="usesTaskFilters ? '' : 'sm:col-span-2 lg:col-span-5'">
             <label for="task-division" class="sr-only">Divisi</label>
-            <select id="task-division" x-model="filters.division_id" @change="applyFilters()" class="{{ $fieldClass }}">
+            <select id="task-division" x-model="filters.division" @change="applyFilters()" class="{{ $fieldClass }}">
                 <option value="">Semua Divisi</option>
-                <template x-for="division in config.divisions" :key="division.id">
-                    <option :value="String(division.id)" x-text="division.name" :selected="String(division.id) === filters.division_id"></option>
+                <template x-for="division in meta.divisions" :key="division.code_division">
+                    <option :value="division.code_division" x-text="division.name" :selected="division.code_division === filters.division"></option>
                 </template>
             </select>
         </div>
@@ -38,8 +38,8 @@
             <label for="task-pic" class="sr-only">PIC</label>
             <select id="task-pic" x-model="filters.pic_id" @change="applyFilters()" class="{{ $fieldClass }}">
                 <option value="">Semua PIC</option>
-                <template x-for="pic in config.pics" :key="pic.id">
-                    <option :value="String(pic.id)" x-text="pic.fullname + (pic.division ? ' · ' + pic.division : '')" :selected="String(pic.id) === filters.pic_id"></option>
+                <template x-for="pic in meta.pics" :key="pic.id">
+                    <option :value="String(pic.id)" x-text="pic.fullname" :selected="String(pic.id) === filters.pic_id"></option>
                 </template>
             </select>
         </div>
@@ -141,6 +141,8 @@
                 <input id="period-to" type="date" x-model="period.to" :min="period.from || null" @change="applyPeriod()" class="{{ $fieldClass }} w-auto">
             </div>
         </div>
+
+        <p x-show="Object.keys(periodErrors).length" x-cloak class="w-full text-xs text-red-600" role="alert" x-text="Object.values(periodErrors)[0]?.[0]"></p>
 
         <p x-show="hasPeriod" x-cloak class="text-xs text-slate-500 lg:ml-auto">Tugas tanpa <span x-text="filters.date_field === 'start_date' ? 'tanggal mulai' : 'deadline'"></span> tidak termasuk hasil filter periode.</p>
     </div>

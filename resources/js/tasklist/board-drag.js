@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { moveBlocker } from './contract';
 import { transitionLabel } from './format';
 
 const MOUSE_DRAG_DISTANCE = 6;
@@ -34,16 +35,15 @@ export default {
     },
 
     /** A PIC needs evidence to move a task to Ready Review; the API checks it too, this only explains it before the request. */
-    needsEvidence(task, status) {
-        const isPic = Boolean(task?.pics?.some((pic) => pic.id === this.config.user.id));
-
-        return status === 'ready_review' && isPic && task.evidences_count === 0;
+    /** A condition the task still has to meet before this move (a PIC, or evidence); the API checks it again. */
+    blockerFor(task, status) {
+        return task && task.abilities.transitions.includes(status) ? moveBlocker(task, status) : null;
     },
 
     isDropAllowed(status) {
         const task = this.drag.task;
 
-        return Boolean(task?.abilities.transitions.includes(status)) && !this.needsEvidence(task, status);
+        return Boolean(task?.abilities.transitions.includes(status)) && !this.blockerFor(task, status);
     },
 
     /** How a column looks while a card is being dragged: its own column, an allowed target, or a refused one. */
@@ -58,9 +58,11 @@ export default {
     refusedLabel(status) {
         const task = this.drag.task;
 
-        return task?.abilities.transitions.includes(status) && this.needsEvidence(task, status)
-            ? 'Butuh evidence'
-            : 'Tidak diizinkan';
+        const blocker = this.blockerFor(task, status);
+
+        if (!blocker) return 'Tidak diizinkan';
+
+        return blocker.includes('PIC') ? 'Butuh PIC' : 'Butuh evidence';
     },
 
     dropHint(status) {
@@ -213,7 +215,7 @@ export default {
             status,
             label: transitionLabel(task.status, status),
             target: this.statusLabel(status),
-            hint: this.needsEvidence(task, status) ? 'Lampirkan evidence terlebih dahulu' : null,
+            hint: this.blockerFor(task, status),
         }));
     },
 
@@ -230,8 +232,10 @@ export default {
             return;
         }
 
-        if (this.needsEvidence(task, status)) {
-            Alpine.store('toast').error('Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.');
+        const blocker = this.blockerFor(task, status);
+
+        if (blocker) {
+            Alpine.store('toast').error(blocker);
 
             return;
         }

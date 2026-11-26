@@ -80,8 +80,8 @@
                         <button x-show="task.abilities.delete" type="button" @click="deleteTask()" :disabled="busy !== null" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60">Hapus</button>
                     </div>
 
-                    <p x-show="task.abilities.add_evidence && transitions.includes('ready_review') && task.evidences.length === 0" class="text-xs text-amber-700">
-                        Sebelum "Kirim untuk Review", lampirkan minimal satu evidence di tab
+                    <p x-show="task.evidence_required && task.status === 'in_progress' && task.evidences.length === 0 && transitions.length > 0" class="text-xs text-amber-700">
+                        Tugas ini wajib evidence. Sebelum mengubah status, lampirkan minimal satu evidence di tab
                         <button type="button" @click="selectTab('evidence')" class="font-semibold underline hover:text-amber-900">Evidence</button>.
                     </p>
                 </div>
@@ -138,27 +138,34 @@
                             </ul>
 
                             <div x-show="assignment.open" class="mt-3 space-y-3">
-                                <label x-show="config.user.manages_all_divisions" class="flex items-center gap-2 text-xs text-slate-600">
-                                    <input type="checkbox" x-model="assignment.allDivisions" @change="loadPicOptions()" class="rounded border-burgundy-300 text-burgundy-600">
-                                    Tampilkan PIC semua divisi
-                                </label>
+                                <p x-show="assignment.lockedReason" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200" x-text="assignment.lockedReason"></p>
+                                <div x-show="assignment.canChangeDivision">
+                                    <label for="assignment-division" class="mb-1 block text-xs font-medium text-slate-600">Divisi tugas (teruskan ke divisi lain)</label>
+                                    <select id="assignment-division" x-model="assignment.divisionId" class="{{ $fieldClass }}">
+                                        <template x-for="division in assignment.divisions" :key="division.id">
+                                            <option :value="division.id" x-text="division.name" :selected="Number(division.id) === Number(assignment.divisionId)"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <input type="search" x-model="assignment.query" placeholder="Cari nama atau divisi…" class="{{ $fieldClass }}" aria-label="Cari PIC">
                                 <div class="max-h-48 overflow-y-auto rounded-lg border border-burgundy-200 p-2">
                                     <p x-show="assignment.loading" class="px-1 py-2 text-xs text-slate-500">Memuat daftar PIC…</p>
-                                    <p x-show="!assignment.loading && assignment.items.length === 0" class="px-1 py-2 text-xs text-slate-500">Tidak ada akun aktif yang dapat ditugaskan.</p>
-                                    <template x-for="pic in assignment.items" :key="pic.id">
+                                    <p x-show="!assignment.loading && assignmentChoices.length === 0" class="px-1 py-2 text-xs text-slate-500">Tidak ada akun yang dapat ditugaskan.</p>
+                                    <template x-for="pic in assignmentChoices" :key="pic.id">
                                         <label class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-burgundy-50">
-                                            <input type="checkbox" :checked="assignment.selected.includes(pic.id)" @change="togglePic(pic.id)" class="rounded border-burgundy-300 text-burgundy-600">
+                                            <input type="checkbox" :checked="assignment.selected.includes(pic.id)" @change="togglePic(pic.id)" :disabled="assignment.lockedReason" class="rounded border-burgundy-300 text-burgundy-600">
                                             <span x-text="pic.fullname"></span>
-                                            <span class="text-xs text-slate-400" x-text="pic.division?.name ?? ''"></span>
+                                            <span class="text-xs text-slate-400" x-text="pic.division?.name ?? 'Tanpa divisi'"></span>
                                         </label>
                                     </template>
                                 </div>
-                                <textarea x-model="assignment.note" rows="2" maxlength="500" placeholder="Catatan penugasan (opsional)" class="{{ $fieldClass }}"></textarea>
+                                <p class="text-xs text-slate-500"><span x-text="assignment.selected.length"></span> PIC dipilih. Daftar ini menggantikan seluruh PIC tugas.</p>
+                                <textarea x-model="assignment.note" rows="2" maxlength="1000" placeholder="Catatan penugasan (opsional)" class="{{ $fieldClass }}"></textarea>
                                 <p x-show="assignment.error" class="text-xs text-red-600" x-text="assignment.error" role="alert"></p>
                                 <p class="text-xs text-slate-500">Mengganti PIC tidak mengubah status tugas. PIC lama dan baru tercatat di histori.</p>
                                 <div class="flex justify-end gap-2">
                                     <button type="button" @click="assignment.open = false" :disabled="assignment.saving" class="rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ring-slate-200 hover:bg-slate-50">Batal</button>
-                                    <button type="button" @click="saveAssignment()" :disabled="assignment.saving || assignment.loading" class="rounded-lg bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-burgundy-700 disabled:opacity-60" x-text="assignment.saving ? 'Menyimpan…' : 'Simpan PIC'"></button>
+                                    <button type="button" @click="saveAssignment()" :disabled="assignment.saving || assignment.loading || assignment.lockedReason" class="rounded-lg bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-burgundy-700 disabled:opacity-60" x-text="assignment.saving ? 'Menyimpan…' : 'Simpan PIC'"></button>
                                 </div>
                             </div>
                         </section>
@@ -180,11 +187,9 @@
                             <div x-show="evidence.type === 'link'" class="space-y-2">
                                 <input type="url" x-model="evidence.url" placeholder="https://…" class="{{ $fieldClass }}">
                                 <p x-show="evidence.errors.url" x-text="evidence.errors.url?.[0]" class="text-xs text-red-600"></p>
-                                <input type="text" x-model="evidence.title" maxlength="150" placeholder="Judul tautan (opsional)" class="{{ $fieldClass }}">
-                                <p x-show="evidence.errors.title" x-text="evidence.errors.title?.[0]" class="text-xs text-red-600"></p>
                             </div>
                             <textarea x-model="evidence.note" rows="2" maxlength="1000" placeholder="Catatan (opsional)" class="{{ $fieldClass }}"></textarea>
-                            <p x-show="evidence.errors.type || evidence.errors.note" x-text="(evidence.errors.type ?? evidence.errors.note)?.[0]" class="text-xs text-red-600"></p>
+                            <p x-show="evidence.errors.evidence || evidence.errors.note" x-text="(evidence.errors.evidence ?? evidence.errors.note)?.[0]" class="text-xs text-red-600"></p>
                             <div class="flex justify-end">
                                 <button type="submit" :disabled="evidence.saving" class="inline-flex items-center gap-2 rounded-lg bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-burgundy-700 disabled:opacity-60">
                                     <svg x-show="evidence.saving" class="size-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" /><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" /></svg>
@@ -193,7 +198,7 @@
                             </div>
                         </form>
 
-                        <p x-show="task.abilities.add_evidence && task.evidences.length === 0 && ['backlog', 'todo', 'in_progress'].includes(task.status)" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Lampirkan minimal satu evidence sebelum mengirim tugas ke Ready Review.</p>
+                        <p x-show="task.evidence_required && task.evidences.length === 0 && ['backlog', 'todo', 'in_progress'].includes(task.status)" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">Tugas ini wajib melampirkan evidence sebelum dikirim atau diselesaikan.</p>
 
                         <ul class="space-y-2">
                             <li x-show="task.evidences.length === 0" class="py-6 text-center text-sm text-slate-400">Belum ada evidence.</li>
@@ -231,8 +236,8 @@
                             <textarea x-model="review.note" rows="3" maxlength="1000" placeholder="Catatan review (wajib untuk Request Revision)" class="{{ $fieldClass }}" :aria-invalid="!!review.error"></textarea>
                             <p x-show="review.error" class="text-xs text-red-600" x-text="review.error" role="alert"></p>
                             <div class="flex flex-wrap justify-end gap-2">
-                                <button type="button" @click="decideReview('revision_requested')" :disabled="review.saving" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-300 hover:bg-amber-50 disabled:opacity-60">Request Revision</button>
-                                <button type="button" @click="decideReview('approved')" :disabled="review.saving" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">Approve</button>
+                                <button type="button" @click="decideReview('revision')" :disabled="review.saving" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-300 hover:bg-amber-50 disabled:opacity-60">Request Revision</button>
+                                <button type="button" @click="decideReview('approve')" :disabled="review.saving" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">Approve</button>
                             </div>
                         </section>
 
@@ -241,9 +246,9 @@
                         <ol class="space-y-2">
                             <li x-show="task.reviews.length === 0" class="py-6 text-center text-sm text-slate-400">Belum ada hasil review.</li>
                             <template x-for="item in task.reviews" :key="item.id">
-                                <li class="rounded-xl p-3 ring-1" :class="item.decision === 'approved' ? 'ring-emerald-200 bg-emerald-50/50' : 'ring-amber-200 bg-amber-50/50'">
+                                <li class="rounded-xl p-3 ring-1" :class="item.is_approval ? 'ring-emerald-200 bg-emerald-50/50' : 'ring-amber-200 bg-amber-50/50'">
                                     <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <span class="text-sm font-semibold" :class="item.decision === 'approved' ? 'text-emerald-800' : 'text-amber-800'" x-text="item.decision_label"></span>
+                                        <span class="text-sm font-semibold" :class="item.is_approval ? 'text-emerald-800' : 'text-amber-800'" x-text="item.decision_label + (item.cycle ? ' · Review ke-' + item.cycle : '')"></span>
                                         <span class="text-xs text-slate-500" x-text="(item.reviewer?.fullname ?? '—') + ' · ' + formatDateTime(item.created_at)"></span>
                                     </div>
                                     <p x-show="item.note" class="mt-1 text-sm whitespace-pre-line text-slate-700" x-text="item.note"></p>
@@ -262,18 +267,15 @@
                         <ul x-show="!comments.loading && !comments.error" class="space-y-3">
                             <li x-show="comments.items.length === 0" class="py-6 text-center text-sm text-slate-400">Belum ada komentar.</li>
                             <template x-for="comment in comments.items" :key="comment.id">
-                                <li class="rounded-xl p-3 ring-1 ring-burgundy-100">
-                                    <p class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><span class="font-semibold text-slate-700" x-text="comment.author?.fullname ?? '—'"></span><span x-show="comment.author_role" class="rounded bg-burgundy-50 px-1.5 text-[10px] font-medium text-burgundy-700" x-text="comment.author_role"></span><span x-text="'· ' + formatDateTime(comment.created_at)"></span></p>
+                                <li class="rounded-xl p-3 ring-1" :class="comment.parent_comment_id ? 'ml-6 ring-burgundy-50 bg-burgundy-50/30' : 'ring-burgundy-100'">
+                                    <p class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                                        <span class="font-semibold text-slate-700" x-text="comment.author?.fullname ?? '—'"></span>
+                                        <span x-show="comment.author?.role" class="rounded bg-burgundy-50 px-1.5 text-[10px] font-medium text-burgundy-700" x-text="comment.author?.role?.name"></span>
+                                        <span x-text="'· ' + formatDateTime(comment.created_at)"></span>
+                                    </p>
+                                    <p x-show="comment.reply_to" class="mt-0.5 text-[11px] text-slate-500" x-text="'↳ membalas ' + (comment.reply_to?.author?.fullname ?? 'komentar')"></p>
                                     <p class="mt-1 text-sm whitespace-pre-line text-slate-800" x-text="comment.content"></p>
                                     <button x-show="task.abilities.comment" type="button" @click="comments.replyTo = comment; $nextTick(() => $refs.commentBox.focus())" class="mt-1 text-xs font-medium text-burgundy-700 hover:underline">Balas</button>
-                                    <ul x-show="comment.replies?.length" class="mt-2 space-y-2 border-l-2 border-burgundy-100 pl-3">
-                                        <template x-for="reply in comment.replies" :key="reply.id">
-                                            <li>
-                                                <p class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500"><span class="font-semibold text-slate-700" x-text="reply.author?.fullname ?? '—'"></span><span x-show="reply.author_role" class="rounded bg-burgundy-50 px-1.5 text-[10px] font-medium text-burgundy-700" x-text="reply.author_role"></span><span x-text="'· ' + formatDateTime(reply.created_at)"></span></p>
-                                                <p class="text-sm whitespace-pre-line text-slate-800" x-text="reply.content"></p>
-                                            </li>
-                                        </template>
-                                    </ul>
                                 </li>
                             </template>
                         </ul>
@@ -282,8 +284,8 @@
                                 <span x-text="'Membalas ' + (comments.replyTo?.author?.fullname ?? '')"></span>
                                 <button type="button" @click="comments.replyTo = null" class="font-semibold">Batal</button>
                             </p>
-                            <textarea x-ref="commentBox" x-model="comments.content" rows="2" maxlength="5000" placeholder="Tulis komentar…" class="{{ $fieldClass }}"></textarea>
-                            <p x-show="comments.errors.content || comments.errors.parent_comment_id" x-text="(comments.errors.content ?? comments.errors.parent_comment_id)?.[0]" class="text-xs text-red-600"></p>
+                            <textarea x-ref="commentBox" x-model="comments.content" rows="2" maxlength="2000" placeholder="Tulis komentar…" class="{{ $fieldClass }}"></textarea>
+                            <p x-show="comments.errors.content || comments.errors.parent_comment_id || comments.errors.client_request_id" x-text="(comments.errors.content ?? comments.errors.parent_comment_id ?? comments.errors.client_request_id)?.[0]" class="text-xs text-red-600"></p>
                             <div class="flex justify-end">
                                 <button type="submit" :disabled="comments.saving || !comments.content.trim()" class="rounded-lg bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-burgundy-700 disabled:opacity-60" x-text="comments.saving ? 'Mengirim…' : 'Kirim Komentar'"></button>
                             </div>
@@ -304,13 +306,9 @@
                             <template x-for="activity in activities.items" :key="activity.id">
                                 <li class="relative">
                                     <span class="absolute top-1.5 -left-[27px] size-3 rounded-full bg-burgundy-500 ring-4 ring-white"></span>
-                                    <p class="text-sm font-semibold text-slate-800" x-text="activity.label"></p>
-                                    <p class="text-xs text-slate-500" x-text="(activity.account?.fullname ?? 'Sistem') + ' · ' + formatDateTime(activity.created_at)"></p>
-                                    <ul class="mt-1 space-y-0.5 text-xs text-slate-600">
-                                        <template x-for="line in describeChanges(activity)">
-                                            <li class="break-words" x-text="line"></li>
-                                        </template>
-                                    </ul>
+                                    <p class="text-sm font-semibold text-slate-800" x-text="activity.action_label"></p>
+                                    <p class="text-xs text-slate-500" x-text="(activity.actor?.fullname ?? 'Sistem') + ' · ' + formatDateTime(activity.created_at)"></p>
+                                    <p x-show="activity.description" class="mt-1 text-xs break-words whitespace-pre-line text-slate-600" x-text="activity.description"></p>
                                 </li>
                             </template>
                         </ol>
