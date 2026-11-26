@@ -1,41 +1,48 @@
 import Alpine from 'alpinejs';
 import { http } from '../http';
 import boardDrag from './board-drag';
+import { normalizeTask, reviewDecisionFor, STATUS_LABELS } from './contract';
 import { formatting } from './format';
 
 const VIEWS = ['board', 'table', 'timeline', 'calendar'];
+const SCOPE_MY_TASKS = 'my_tasks';
 const DEFAULT_FILTERS = {
     scope: '',
     search: '',
-    division_id: '',
+    division: '',
     pic_id: '',
     priority: '',
     status: '',
+    filter_mode: '',
     date_field: '',
     date: '',
     month: '',
     year: '',
-    date_from: '',
-    date_to: '',
+    start_date: '',
+    end_date: '',
 };
-const PERIOD_KEYS = ['date', 'month', 'year', 'date_from', 'date_to'];
+const BASIC_FILTER_KEYS = ['search', 'division', 'pic_id', 'priority', 'status'];
+const PERIOD_KEYS = ['filter_mode', 'date', 'month', 'year', 'start_date', 'end_date'];
+const PERIOD_PARAMS = { date: ['date'], month: ['month', 'year'], year: ['year'], range: ['start_date', 'end_date'] };
 const emptyPeriod = () => ({ mode: '', date: '', monthNumber: '', monthYear: '', year: '', from: '', to: '' });
 const monthNames = Array.from({ length: 12 }, (_, index) =>
     new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, index, 1)));
 const DEFAULT_SORT = { sort: 'created_at', direction: 'desc' };
-const BOARD_LIMIT = 100;
 const TABLE_PAGE_SIZES = [15, 25, 50, 100];
 
 /**
  * The Tasklist page: shared filters, the Board and Table views (same API, same filters), the KPI summary and drag-and-drop.
+ * Data comes from the Tasklist API (/api/tasks); every right follows the flags the API returns per task.
  */
 export default (config) => ({
     ...formatting,
     ...boardDrag,
     config,
+    meta: { divisions: [], pics: [], default_division: null, role_code: null, loaded: false },
     view: 'board',
     filters: { ...DEFAULT_FILTERS },
     period: emptyPeriod(),
+    periodErrors: {},
     monthNames,
     highlightId: null,
     sort: DEFAULT_SORT.sort,
@@ -51,15 +58,36 @@ export default (config) => ({
     revision: { open: false, task: null, note: '', error: null, saving: false },
     sequence: { board: 0, table: 0, summary: 0 },
 
-    init() {
+    async init() {
         this.initBoardDrag();
-        this.readUrl();
+        const hasDivisionInUrl = this.readUrl();
+
+        await this.loadMeta();
+
+        // A Manager starts on the division they manage; a division in the URL always wins.
+        if (!hasDivisionInUrl && this.meta.default_division) {
+            this.filters.division = this.meta.default_division;
+            this.syncUrl();
+        }
+
         this.refresh();
+        this.$dispatch('tasklist-filters-changed', { filters: { ...this.filters } });
 
         const taskId = new URLSearchParams(window.location.search).get('task');
 
         if (taskId) {
-            this.$nextTick(() => this.openTask(Number(taskId)));
+            this.openTask(Number(taskId));
+        }
+    },
+
+    /** Divisions and PICs for the filters, and the role, from GET /api/tasks/meta. */
+    async loadMeta() {
+        try {
+            const { data } = await http(this.config.urls.meta);
+            this.meta = { ...data, loaded: true };
+        } catch (error) {
+            this.meta = { ...this.meta, loaded: true };
+            Alpine.store('toast').error(`Pilihan filter gagal dimuat. ${error.message}`);
         }
     },
 
@@ -69,11 +97,11 @@ export default (config) => ({
     },
 
     get isMyTasks() {
-        return this.filters.scope === 'mine';
+        return this.filters.scope === SCOPE_MY_TASKS;
     },
 
     get hasPeriod() {
-        return PERIOD_KEYS.some((key) => this.filters[key] !== '');
+        return this.filters.filter_mode !== '';
     },
 
     get yearOptions() {
@@ -93,22 +121,47 @@ export default (config) => ({
     },
 
     statusLabel(status) {
-        return this.config.statuses.find((option) => option.value === status)?.label ?? status;
+        return STATUS_LABELS[status] ?? status;
     },
 
-    divisionName(id) {
-        return this.config.divisions.find((division) => String(division.id) === String(id))?.name ?? 'Divisi';
+    divisionName(code) {
+        return this.meta.divisions.find((division) => division.code_division === code)?.name ?? 'Divisi';
     },
 
     column(status) {
         return this.board.tasks.filter((task) => task.status === status);
     },
 
-    activeFilters() {
-        return Object.fromEntries(Object.entries(this.filters).filter(([key, value]) =>
-            value !== '' && (key !== 'date_field' || this.hasPeriod)));
+    /** The list filters as GET /api/tasks expects them: only set values, and only the parameters of the active period. */
+    listQuery() {
+        const filters = this.filters;
+        const query = {};
+
+        if (this.isMyTasks) query.scope = SCOPE_MY_TASKS;
+
+        BASIC_FILTER_KEYS.forEach((key) => {
+            if (filters[key] !== '') query[key] = filters[key];
+        });
+
+        if (filters.filter_mode) {
+            query.filter_mode = filters.filter_mode;
+            query.date_field = filters.date_field || 'deadline';
+            PERIOD_PARAMS[filters.filter_mode].forEach((key) => {
+                query[key] = filters[key];
+            });
+        }
+
+        return query;
     },
 
+    /** The same filters for the monitoring KPIs, so the summary matches the Board and Table. */
+    summaryQuery() {
+        const { scope, ...filters } = this.listQuery();
+
+        return { ...filters, scope: 'tasklist', task_scope: scope ?? 'all_tasks' };
+    },
+
+    /** @returns {boolean} whether the URL chose a division */
     readUrl() {
         const params = new URLSearchParams(window.location.search);
 
@@ -116,27 +169,39 @@ export default (config) => ({
         Object.keys(DEFAULT_FILTERS).forEach((key) => {
             this.filters[key] = params.get(key) ?? '';
         });
+
+        if (this.filters.scope !== SCOPE_MY_TASKS) this.filters.scope = '';
+        if (!PERIOD_PARAMS[this.filters.filter_mode]) this.clearPeriodFilters();
+
         this.sort = params.get('sort') ?? DEFAULT_SORT.sort;
         this.direction = params.get('direction') === 'asc' ? 'asc' : 'desc';
         this.page = Math.max(1, Number(params.get('page')) || 1);
         this.perPage = TABLE_PAGE_SIZES.includes(Number(params.get('per_page'))) ? Number(params.get('per_page')) : TABLE_PAGE_SIZES[0];
         this.syncPeriodFromFilters();
+
+        return params.has('division');
     },
 
-    /** Rebuild the period controls from the API filters (after reading the URL). */
+    clearPeriodFilters() {
+        PERIOD_KEYS.forEach((key) => {
+            this.filters[key] = '';
+        });
+    },
+
+    /** Rebuild the period controls from the filters (after reading the URL). */
     syncPeriodFromFilters() {
         const filters = this.filters;
-        const [monthYear = '', monthNumber = ''] = filters.month.split('-');
+        const mode = filters.filter_mode;
 
         this.period = {
             ...emptyPeriod(),
-            mode: filters.date ? 'date' : filters.month ? 'month' : filters.year ? 'year' : (filters.date_from || filters.date_to) ? 'range' : '',
+            mode,
             date: filters.date,
-            monthNumber: monthNumber ? String(Number(monthNumber)) : '',
-            monthYear,
-            year: filters.year,
-            from: filters.date_from,
-            to: filters.date_to,
+            monthNumber: mode === 'month' ? filters.month : '',
+            monthYear: mode === 'month' ? filters.year : '',
+            year: mode === 'year' ? filters.year : '',
+            from: filters.start_date,
+            to: filters.end_date,
         };
     },
 
@@ -154,31 +219,35 @@ export default (config) => ({
         if (mode === '' || mode === 'month' || mode === 'year') this.applyPeriod();
     },
 
-    /** Turn the period controls into the API filters; only one kind of period is active at a time. */
+    /** Turn the period controls into the API period filter; only one kind of period is active at a time. */
     applyPeriod() {
         const period = this.period;
+        this.periodErrors = {};
 
         if (period.mode === 'range' && period.from && period.to && period.to < period.from) {
-            Alpine.store('toast').error('Tanggal akhir tidak boleh sebelum tanggal awal.');
+            this.periodErrors = { end_date: ['Tanggal akhir tidak boleh sebelum tanggal awal.'] };
 
             return;
         }
 
-        PERIOD_KEYS.forEach((key) => {
-            this.filters[key] = '';
-        });
+        const values = {
+            date: { date: period.date },
+            month: { month: period.monthNumber, year: period.monthYear },
+            year: { year: period.year },
+            range: { start_date: period.from, end_date: period.to },
+        }[period.mode] ?? {};
 
-        if (period.mode === 'date') this.filters.date = period.date;
-        if (period.mode === 'month' && period.monthNumber && period.monthYear) {
-            this.filters.month = `${period.monthYear}-${String(period.monthNumber).padStart(2, '0')}`;
-        }
-        if (period.mode === 'year') this.filters.year = period.year;
-        if (period.mode === 'range') {
-            this.filters.date_from = period.from;
-            this.filters.date_to = period.to;
+        // A period is only sent once every value it needs is filled in.
+        const isComplete = period.mode !== '' && Object.values(values).every((value) => value !== '');
+
+        this.clearPeriodFilters();
+
+        if (isComplete) {
+            this.filters.filter_mode = period.mode;
+            Object.assign(this.filters, values);
         }
 
-        this.applyFilters();
+        if (period.mode === '' || isComplete) this.applyFilters();
     },
 
     /** Keep the view and filters in the address bar, so a reload or a shared link shows the same data. */
@@ -187,6 +256,7 @@ export default (config) => ({
         const state = {
             view: this.view === 'board' ? '' : this.view,
             ...this.filters,
+            date_field: this.filters.filter_mode ? this.filters.date_field : '',
             sort: this.sort === DEFAULT_SORT.sort ? '' : this.sort,
             direction: this.direction === DEFAULT_SORT.direction ? '' : this.direction,
             page: this.page > 1 && this.view === 'table' ? this.page : '',
@@ -212,11 +282,13 @@ export default (config) => ({
         this.$dispatch('tasklist-filters-changed', { filters: { ...this.filters } });
     },
 
-    /** Switch between "Semua Tugas" and "Tugas Saya"; every view follows the same scope. */
+    /** Switch between "Semua Tugas" and "Tugas Saya"; the filters stay. */
     setScope(scope) {
-        if (this.filters.scope === scope) return;
+        const value = scope === SCOPE_MY_TASKS ? SCOPE_MY_TASKS : '';
 
-        this.filters.scope = scope;
+        if (this.filters.scope === value) return;
+
+        this.filters.scope = value;
         this.applyFilters();
     },
 
@@ -224,6 +296,7 @@ export default (config) => ({
     resetFilters() {
         this.filters = { ...DEFAULT_FILTERS, scope: this.filters.scope };
         this.period = emptyPeriod();
+        this.periodErrors = {};
         this.sort = DEFAULT_SORT.sort;
         this.direction = DEFAULT_SORT.direction;
         this.applyFilters();
@@ -248,22 +321,36 @@ export default (config) => ({
             const response = await request();
             if (ticket === this.sequence[kind]) onSuccess(response);
         } catch (error) {
-            if (ticket === this.sequence[kind]) state.error = error.message;
+            if (ticket !== this.sequence[kind]) return;
+
+            state.error = error.message;
+            this.showPeriodErrors(error);
         } finally {
             if (ticket === this.sequence[kind]) state.loading = false;
         }
     },
 
+    /** A 422 on the period parameters is shown next to the period controls. */
+    showPeriodErrors(error) {
+        const fields = ['filter_mode', 'date_field', ...PERIOD_KEYS];
+        const periodErrors = Object.fromEntries(Object.entries(error.errors ?? {}).filter(([field]) => fields.includes(field)));
+
+        if (Object.keys(periodErrors).length) this.periodErrors = periodErrors;
+    },
+
+    normalize(tasks) {
+        return tasks.map((task) => normalizeTask(task, this.config.user.id));
+    },
+
+    /** The Board gets every matching task at once (no per_page), with the counts per status. */
     loadBoard() {
         return this.latest(
             'board',
-            () => http(this.config.urls.tasks, {
-                query: { ...this.activeFilters(), sort: this.sort, direction: this.direction, per_page: BOARD_LIMIT },
-            }),
+            () => http(this.config.urls.tasks, { query: { ...this.listQuery(), sort: this.sort, direction: this.direction } }),
             (response) => {
-                this.board.tasks = response.data;
-                this.board.counts = response.meta.status_counts;
-                this.board.total = response.meta.total;
+                this.board.tasks = this.normalize(response.data);
+                this.board.counts = response.meta?.status_counts ?? {};
+                this.board.total = this.board.tasks.length;
             },
         );
     },
@@ -272,10 +359,10 @@ export default (config) => ({
         return this.latest(
             'table',
             () => http(this.config.urls.tasks, {
-                query: { ...this.activeFilters(), sort: this.sort, direction: this.direction, per_page: this.perPage, page: this.page },
+                query: { ...this.listQuery(), sort: this.sort, direction: this.direction, per_page: this.perPage, page: this.page },
             }),
             (response) => {
-                this.table.tasks = response.data;
+                this.table.tasks = this.normalize(response.data);
                 this.table.meta = response.meta;
 
                 if (response.meta.last_page > 0 && this.page > response.meta.last_page) {
@@ -285,12 +372,31 @@ export default (config) => ({
         );
     },
 
+    /** KPIs from GET /api/tasks/monitoring?scope=tasklist, mapped to the keys the summary cards use. */
     loadSummary() {
         return this.latest(
             'summary',
-            () => http(this.config.urls.summary, { query: this.activeFilters() }),
-            (response) => {
-                this.summary.data = response.data;
+            () => http(this.config.urls.summary, { query: this.summaryQuery() }),
+            ({ data }) => {
+                const metrics = data.metrics;
+
+                this.summary.data = {
+                    scope: data.scope,
+                    completion_rate: metrics.completion_rate,
+                    metrics: {
+                        total: metrics.total_tasks,
+                        backlog: metrics.backlog,
+                        todo: metrics.todo,
+                        in_progress: metrics.on_process,
+                        ready_review: metrics.ready_review,
+                        on_review: metrics.on_review,
+                        completed: metrics.completed,
+                        unfinished: metrics.unfinished,
+                        overdue: metrics.overdue,
+                        due_today: metrics.due_today,
+                        urgent: metrics.urgent,
+                    },
+                };
             },
         );
     },
@@ -311,7 +417,7 @@ export default (config) => ({
 
     setSort(column) {
         this.sort = column;
-        this.direction = ['title', 'deadline', 'start_date'].includes(column) ? 'asc' : 'desc';
+        this.direction = ['title', 'deadline', 'start_date', 'division', 'pic'].includes(column) ? 'asc' : 'desc';
         this.page = 1;
         this.syncUrl();
         this.refresh();
@@ -400,7 +506,7 @@ export default (config) => ({
      * Other filters are cleared so no deadline of that date is hidden.
      */
     showDeadlinesInTable(date) {
-        this.filters = { ...DEFAULT_FILTERS, division_id: this.filters.division_id, scope: this.filters.scope };
+        this.filters = { ...DEFAULT_FILTERS, division: this.filters.division, scope: this.filters.scope, date_field: 'deadline' };
         this.period = { ...emptyPeriod(), mode: 'date', date };
         this.sort = 'priority';
         this.direction = 'desc';
@@ -409,11 +515,11 @@ export default (config) => ({
     },
 
     /**
-     * Arrive on the Board from the calendar preview: clear filters that could hide the task (keeping its division),
-     * highlight its card and open its detail. Navigation never grants extra rights; the detail follows the API abilities.
+     * Arrive on the Board from the calendar preview (TASK-15): clear filters that could hide the task (keeping its
+     * division), highlight its card and open its detail. Navigation never grants extra rights; the detail follows the API.
      */
     async focusTaskOnBoard(preview) {
-        this.filters = { ...DEFAULT_FILTERS, division_id: String(preview.board.filters.division_id ?? '') };
+        this.filters = { ...DEFAULT_FILTERS, division: preview.division?.code_division ?? '' };
         this.period = emptyPeriod();
         this.sort = DEFAULT_SORT.sort;
         this.direction = DEFAULT_SORT.direction;
@@ -431,6 +537,7 @@ export default (config) => ({
             await this.loadBoard();
         }
 
+        this.$dispatch('tasklist-filters-changed', { filters: { ...this.filters } });
         this.openTask(preview.id);
         this.$nextTick(() => document.getElementById(`task-card-${preview.id}`)
             ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }));
@@ -458,24 +565,33 @@ export default (config) => ({
         }
 
         if (task.status === 'in_progress' && status === 'done' && task.requires_review) {
-            return 'Tugas ini wajib review, kirim ke Ready Review terlebih dahulu.';
+            return 'Tugas ini wajib melalui Ready Review dan On Review sebelum Done.';
         }
 
-        return `Perpindahan dari ${this.statusLabel(task.status)} ke ${this.statusLabel(status)} tidak diizinkan untuk Anda.`;
+        return `Status tidak dapat diubah dari ${this.statusLabel(task.status)} ke ${this.statusLabel(status)}.`;
     },
 
-    /** Move the card at once, then save; on failure the card returns to its previous column. */
+    /**
+     * Move the card at once, then save; on failure the card returns to its previous column. Leaving On Review is a
+     * review decision (POST /reviews); every other move is PATCH /status.
+     */
     async moveTask(task, status, note = null) {
         const previousStatus = task.status;
+        const decision = reviewDecisionFor(previousStatus, status);
 
         this.movingIds[task.id] = true;
         this.setCardStatus(task, status);
 
         try {
-            const response = await http(`${this.config.urls.tasks}/${task.id}/status`, {
-                method: 'PATCH',
-                body: { status, version: task.version, note },
-            });
+            const response = decision
+                ? await http(`${this.config.urls.tasks}/${task.id}/reviews`, {
+                    method: 'POST',
+                    body: { decision, note, version: task.version },
+                })
+                : await http(`${this.config.urls.tasks}/${task.id}/status`, {
+                    method: 'PATCH',
+                    body: { status, version: task.version },
+                });
 
             Alpine.store('toast').success(response.message ?? 'Status tugas berhasil diperbarui.');
             this.$dispatch('tasks-changed', { id: task.id });

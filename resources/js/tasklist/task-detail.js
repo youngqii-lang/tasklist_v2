@@ -1,25 +1,36 @@
 import Alpine from 'alpinejs';
 import { http } from '../http';
+import { normalizeTask, PRIORITY_LABELS, REVIEW_DECISIONS, STATUS_LABELS } from './contract';
 import { formatting, transitionLabel } from './format';
 
-const FIELD_LABELS = {
-    title: 'Judul',
-    description: 'Deskripsi',
-    status: 'Status',
-    priority: 'Prioritas',
-    pics: 'PIC',
-    deadline: 'Deadline',
-    start_date: 'Tanggal mulai',
-    division: 'Divisi',
-    category: 'Kategori',
-    platform: 'Platform',
-    requires_review: 'Kewajiban QA',
-    evidence_required: 'Wajib evidence',
-    evidence: 'Evidence',
-    note: 'Catatan',
-};
+const emptyEvidence = () => ({ type: 'file', file: null, url: '', note: '', errors: {}, saving: false });
+const emptyAssignment = () => ({
+    open: false,
+    loading: false,
+    saving: false,
+    error: null,
+    lockedReason: null,
+    query: '',
+    items: [],
+    divisions: [],
+    canChangeDivision: false,
+    divisionId: null,
+    originalDivisionId: null,
+    selected: [],
+    note: '',
+});
 
-const emptyEvidence = () => ({ type: 'file', file: null, url: '', title: '', note: '', errors: {}, saving: false });
+/** A new id for each comment the user sends, so a retried request never posts the same comment twice. */
+function newRequestId() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+    return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
+}
 
 /**
  * The task detail drawer, opened by an `open-task` event. Every action reloads the task so all views stay in sync.
@@ -34,11 +45,11 @@ export default (config) => ({
     failure: null,
     tab: 'info',
     busy: null,
-    assignment: { open: false, items: [], selected: [], note: '', loading: false, saving: false, error: null, allDivisions: false },
+    assignment: emptyAssignment(),
     evidence: emptyEvidence(),
     review: { note: '', error: null, saving: false },
     activities: { items: [], loading: false, error: null },
-    comments: { items: [], loading: false, error: null, content: '', replyTo: null, saving: false, errors: {} },
+    comments: { items: [], loading: false, error: null, content: '', replyTo: null, saving: false, errors: {}, pending: null },
     confirmation: { open: false, title: '', message: '', label: '', action: null, running: false },
     lightbox: null,
 
@@ -66,7 +77,7 @@ export default (config) => ({
         const latest = this.task?.reviews?.[0];
         const inRework = ['backlog', 'todo', 'in_progress'].includes(this.task?.status);
 
-        return latest?.decision === 'revision_requested' && inRework ? latest : null;
+        return latest?.decision === REVIEW_DECISIONS.revision && inRework ? latest : null;
     },
 
     get canDecideReview() {
@@ -74,11 +85,11 @@ export default (config) => ({
     },
 
     statusLabel(status) {
-        return this.config.statuses.find((option) => option.value === status)?.label ?? status;
+        return STATUS_LABELS[status] ?? status;
     },
 
     priorityLabel(priority) {
-        return this.config.priorities.find((option) => option.value === priority)?.label ?? priority;
+        return PRIORITY_LABELS[priority] ?? priority;
     },
 
     transitionLabel(status) {
@@ -90,8 +101,9 @@ export default (config) => ({
         this.task = null;
         this.tab = 'info';
         this.open = true;
-        this.assignment.open = false;
+        this.assignment = emptyAssignment();
         this.evidence = emptyEvidence();
+        this.comments = { ...this.comments, items: [], content: '', replyTo: null, errors: {}, pending: null };
         this.review = { note: '', error: null, saving: false };
         this.setUrlTask(id);
         this.load();
@@ -114,7 +126,7 @@ export default (config) => ({
         this.failure = null;
 
         try {
-            this.task = (await http(this.url)).data;
+            this.setTask((await http(this.url)).data);
             if (this.tab === 'history') this.loadActivities();
         } catch (error) {
             this.task = null;
@@ -134,9 +146,22 @@ export default (config) => ({
         }
     },
 
+    /** Show a TaskDetail from the API; the history list follows the history it carries. */
+    setTask(task) {
+        this.task = normalizeTask(task, this.config.user.id);
+        this.activities.items = this.task.activities;
+    },
+
+    /** Changes that return the updated TaskDetail show it at once; others (evidence) reload the task. */
     afterChange(response) {
         Alpine.store('toast').success(response.message);
         this.$dispatch('tasks-changed', { id: this.taskId, source: 'detail' });
+
+        if (response.data?.next_statuses !== undefined) {
+            this.setTask(response.data);
+
+            return Promise.resolve();
+        }
 
         return this.load({ silent: true });
     },
@@ -216,31 +241,23 @@ export default (config) => ({
 
     /* PIC assignment ------------------------------------------------------------------------ */
 
-    openAssignment() {
-        this.assignment = {
-            open: true,
-            items: [],
-            selected: this.task.pics.map((pic) => pic.id),
-            note: '',
-            loading: false,
-            saving: false,
-            error: null,
-            allDivisions: false,
-        };
-        this.loadPicOptions();
-    },
-
-    async loadPicOptions() {
-        const allDivisions = this.config.user.manages_all_divisions && this.assignment.allDivisions;
-
-        this.assignment.loading = true;
-        this.assignment.error = null;
+    /** Load who may become PIC (and where the task may be forwarded); the API decides the list and any lock. */
+    async openAssignment() {
+        this.assignment = { ...emptyAssignment(), open: true, loading: true, selected: this.task.pics.map((pic) => pic.id) };
 
         try {
-            const response = await http(this.config.urls.pics, {
-                query: { division_id: allDivisions ? '' : this.task.division.id },
-            });
-            this.assignment.items = response.data;
+            const { data } = await http(`${this.url}/assignment-options`);
+
+            this.assignment = {
+                ...this.assignment,
+                items: data.pics,
+                divisions: data.divisions,
+                canChangeDivision: data.can_change_division,
+                divisionId: data.current_division.id,
+                originalDivisionId: data.current_division.id,
+                lockedReason: data.locked_reason,
+                selected: data.current_pics.map((pic) => pic.id),
+            };
         } catch (error) {
             this.assignment.error = error.message;
         } finally {
@@ -248,27 +265,45 @@ export default (config) => ({
         }
     },
 
+    /** PIC options matching the search, with the chosen ones first. */
+    get assignmentChoices() {
+        const query = this.assignment.query.trim().toLowerCase();
+        const selected = this.assignment.selected;
+        const matches = this.assignment.items.filter((pic) => !query
+            || pic.fullname.toLowerCase().includes(query)
+            || (pic.division?.name ?? '').toLowerCase().includes(query));
+
+        return [...matches].sort((a, b) => Number(selected.includes(b.id)) - Number(selected.includes(a.id)));
+    },
+
     togglePic(id) {
         const selected = this.assignment.selected;
         this.assignment.selected = selected.includes(id) ? selected.filter((picId) => picId !== id) : [...selected, id];
     },
 
+    /** Send the complete PIC list; a division is only sent when the task is forwarded to another one. */
     async saveAssignment() {
         if (this.assignment.saving) return;
+
+        const body = { version: this.task.version, pic_ids: this.assignment.selected, note: this.assignment.note.trim() || null };
+
+        if (this.assignment.canChangeDivision && Number(this.assignment.divisionId) !== this.assignment.originalDivisionId) {
+            body.division_id = Number(this.assignment.divisionId);
+        }
 
         this.assignment.saving = true;
         this.assignment.error = null;
 
         try {
-            const response = await http(`${this.url}/pics`, {
-                method: 'PUT',
-                body: { version: this.task.version, pic_ids: this.assignment.selected, note: this.assignment.note || null },
-            });
-            this.assignment.open = false;
+            const response = await http(`${this.url}/assignment`, { method: 'PATCH', body });
+            this.assignment = emptyAssignment();
             await this.afterChange(response);
         } catch (error) {
             const errors = error.errors;
-            this.assignment.error = errors.pic_ids?.[0] ?? Object.values(errors)[0]?.[0] ?? error.message;
+            this.assignment.error = errors.pic_ids?.[0]
+                ?? Object.entries(errors).find(([field]) => field.startsWith('pic_ids.'))?.[1]?.[0]
+                ?? errors.division_id?.[0]
+                ?? error.message;
             this.onFailure(error);
         } finally {
             this.assignment.saving = false;
@@ -295,15 +330,14 @@ export default (config) => ({
     async submitEvidence() {
         if (this.evidence.saving) return;
 
+        // One evidence is a file or a link, never both.
         const body = new FormData();
-        body.append('type', this.evidence.type);
         if (this.evidence.note) body.append('note', this.evidence.note);
 
         if (this.evidence.type === 'file') {
             if (this.evidence.file) body.append('file', this.evidence.file);
         } else {
             body.append('url', this.evidence.url.trim());
-            if (this.evidence.title) body.append('title', this.evidence.title);
         }
 
         this.evidence.saving = true;
@@ -348,7 +382,7 @@ export default (config) => ({
     async decideReview(decision) {
         if (this.review.saving) return;
 
-        if (decision === 'revision_requested' && !this.review.note.trim()) {
+        if (decision === REVIEW_DECISIONS.revision && !this.review.note.trim()) {
             this.review.error = 'Catatan revisi wajib diisi.';
             Alpine.store('toast').error(this.review.error);
 
@@ -388,35 +422,6 @@ export default (config) => ({
         }
     },
 
-    describeValue(field, value) {
-        if (value === null || value === undefined || value === '') return '—';
-        if (Array.isArray(value)) return value.map((item) => item?.fullname ?? item).join(', ') || '—';
-        if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-        if (typeof value === 'object') return value.name ?? value.fullname ?? JSON.stringify(value);
-        if (field === 'status') return this.statusLabel(value);
-        if (field === 'priority') return this.priorityLabel(value);
-        if (field === 'deadline' || field === 'start_date') return this.formatDate(value);
-
-        return String(value);
-    },
-
-    /** Turn the stored before/after values into readable lines. */
-    describeChanges(activity) {
-        return Object.entries(activity.changes ?? {})
-            .filter(([, change]) => change !== null && change !== undefined)
-            .map(([field, change]) => {
-                const label = FIELD_LABELS[field] ?? field;
-                const isDiff = change && typeof change === 'object' && !Array.isArray(change) && 'to' in change;
-
-                if (!isDiff) return `${label}: ${this.describeValue(field, change)}`;
-                if (change.from === null || (Array.isArray(change.from) && change.from.length === 0)) {
-                    return `${label}: ${this.describeValue(field, change.to)}`;
-                }
-
-                return `${label}: ${this.describeValue(field, change.from)} → ${this.describeValue(field, change.to)}`;
-            });
-    },
-
     /* Comments ------------------------------------------------------------------------------ */
 
     async loadComments() {
@@ -442,17 +447,27 @@ export default (config) => ({
             return;
         }
 
+        const content = this.comments.content.trim();
+        const parentId = this.comments.replyTo?.id ?? null;
+        const pending = this.comments.pending;
+
+        // Sending the same text again after a failure is a retry and keeps its id; anything else is a new comment.
+        if (!pending || pending.content !== content || pending.parentId !== parentId) {
+            this.comments.pending = { content, parentId, requestId: newRequestId() };
+        }
+
         this.comments.saving = true;
         this.comments.errors = {};
 
         try {
             const response = await http(`${this.url}/comments`, {
                 method: 'POST',
-                body: { content: this.comments.content, parent_comment_id: this.comments.replyTo?.id ?? null },
+                body: { content, parent_comment_id: parentId, client_request_id: this.comments.pending.requestId },
             });
             Alpine.store('toast').success(response.message ?? 'Komentar berhasil dikirim.');
             this.comments.content = '';
             this.comments.replyTo = null;
+            this.comments.pending = null;
             await this.loadComments();
         } catch (error) {
             this.comments.errors = error.errors;

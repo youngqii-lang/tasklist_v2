@@ -25,9 +25,14 @@
     </header>
 
     <p x-show="!loading && !error && !isEmpty" class="flex flex-wrap gap-x-4 gap-y-1 border-b border-burgundy-50 px-4 py-2 text-xs text-slate-500">
-        <span><span class="font-semibold text-slate-700" x-text="tasks.length"></span> tugas</span>
+        <span><span class="font-semibold text-slate-700" x-text="visibleTasks.length"></span> tugas</span>
         <span><span class="font-semibold text-slate-700" x-text="events.length"></span> agenda bersama</span>
         <span x-show="overdueCount" class="font-semibold text-red-600" x-text="overdueCount + ' terlambat'"></span>
+    </p>
+
+    <p x-show="hasHiddenFilters || filters.scope === 'my_tasks' || filters.pic_id" x-cloak class="border-b border-burgundy-50 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+        <span x-show="hasHiddenFilters">Filter pencarian, prioritas, atau status sedang diterapkan. </span>
+        <span x-show="filters.scope === 'my_tasks' || filters.pic_id">Timeline menampilkan jadwal semua PIC; filter PIC dan Tugas Saya tidak berlaku di sini.</span>
     </p>
 
     <div x-show="error" x-cloak class="flex flex-col items-center gap-3 px-6 py-12 text-center" role="alert">
@@ -92,7 +97,7 @@
                 </div>
             </div>
 
-            <div x-show="!loading && tasks.length" class="relative mt-4">
+            <div x-show="!loading && visibleTasks.length" class="relative mt-4">
                 <h3 class="mb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">Tugas</h3>
                 <div class="space-y-1">
                     <template x-for="(lane, laneIndex) in taskLanes" :key="'task-lane-' + laneIndex">

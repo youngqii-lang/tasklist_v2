@@ -38,6 +38,8 @@
             <span><span class="font-semibold text-slate-700" x-text="monthSummary.events"></span> agenda bersama</span>
         </p>
 
+        <p x-show="!error && hasHiddenFilters" class="border-b border-burgundy-50 bg-amber-50 px-4 py-2 text-xs text-amber-800">Filter pencarian, prioritas, status, atau PIC Tasklist sedang diterapkan pada deadline. Gunakan Reset Filter untuk menampilkan semua.</p>
+
         <div x-show="!error" class="p-3" :aria-busy="loading" :class="loading && 'opacity-60'">
             <div class="grid grid-cols-7 gap-1 pb-1 text-center text-[11px] font-semibold text-slate-500 uppercase">
                 <template x-for="weekday in weekdays" :key="weekday"><div x-text="weekday"></div></template>
@@ -90,12 +92,7 @@
     <div class="space-y-4">
         <h2 class="text-sm font-semibold text-slate-800 capitalize" x-text="selectedLabel"></h2>
 
-        <div x-show="day.error" class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200" role="alert">
-            <span x-text="day.error"></span>
-            <button type="button" @click="loadDay()" class="ml-1 font-semibold underline">Coba lagi</button>
-        </div>
-
-        <section x-show="!day.error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
+        <section x-show="!error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
             <h3 class="text-xs font-semibold tracking-wide text-[#0c5963] uppercase">Agenda Bersama</h3>
             <p x-show="day.loading" class="py-3 text-sm text-slate-400">Memuat…</p>
             <p x-show="!day.loading && day.events.length === 0" class="py-3 text-sm text-slate-400">Tidak ada agenda bersama pada tanggal ini.</p>
@@ -103,14 +100,14 @@
                 <template x-for="event in day.events" :key="event.id">
                     <li class="rounded-lg bg-[#0c5963]/5 p-3 ring-1 ring-[#0c5963]/15">
                         <p class="text-sm font-semibold text-slate-800" x-text="event.title"></p>
-                        <p class="text-xs text-slate-500" x-text="(event.division?.name ?? 'Semua Divisi') + ' · ' + (event.start === event.end ? eventTime(event) : formatDate(event.start) + ' – ' + formatDate(event.end))"></p>
+                        <p class="text-xs text-slate-500" x-text="(event.division?.name ?? 'Semua Divisi') + ' · ' + (event.start === event.end ? formatDate(event.start) : formatDate(event.start) + ' – ' + formatDate(event.end))"></p>
                         <p x-show="event.description" class="mt-1 text-xs text-slate-700" x-text="event.description"></p>
                     </li>
                 </template>
             </ul>
         </section>
 
-        <section x-show="!day.error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
+        <section x-show="!error" class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100">
             <div class="flex items-center justify-between gap-2">
                 <h3 class="text-xs font-semibold tracking-wide text-burgundy-700 uppercase">Deadline Tugas</h3>
                 <button x-show="!day.loading && day.deadlines.length" type="button" @click="showInTable()" class="text-xs font-semibold text-burgundy-700 hover:underline">Lihat di Table →</button>
