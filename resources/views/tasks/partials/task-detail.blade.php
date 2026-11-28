@@ -49,6 +49,20 @@
         <template x-if="!loading && task">
             <div class="flex min-h-0 flex-1 flex-col">
                 <div class="space-y-3 border-b border-burgundy-100 px-5 py-3">
+                    <div x-show="transitions.length || task.abilities.update || task.abilities.delete" class="flex flex-wrap gap-2">
+                        <template x-for="status in transitions" :key="status">
+                            <button
+                                type="button"
+                                @click="changeStatus(status)"
+                                :disabled="busy !== null"
+                                class="rounded-lg bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-burgundy-700 disabled:opacity-60"
+                                x-text="busy === 'status:' + status ? 'Memproses…' : transitionLabel(status)"
+                            ></button>
+                        </template>
+                        <button x-show="task.abilities.update" type="button" @click="editTask()" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">Edit</button>
+                        <button x-show="task.abilities.delete" type="button" @click="deleteTask()" :disabled="busy !== null" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60">Hapus</button>
+                    </div>
+
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="rounded-md px-2 py-0.5 text-xs font-medium ring-1" :class="statusBadge(task.status)" x-text="task.status_label"></span>
                         <span class="rounded-md px-2 py-0.5 text-xs font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
@@ -63,20 +77,6 @@
                     <div x-show="pendingRevision" class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200" role="note">
                         <p class="text-xs font-semibold">Revisi diminta oleh <span x-text="pendingRevision?.reviewer?.fullname ?? 'reviewer'"></span> · <span x-text="formatDateTime(pendingRevision?.created_at)"></span></p>
                         <p class="mt-0.5 whitespace-pre-line" x-text="pendingRevision?.note"></p>
-                    </div>
-
-                    <div x-show="transitions.length || task.abilities.update || task.abilities.delete" class="flex flex-wrap gap-2">
-                        <template x-for="status in transitions" :key="status">
-                            <button
-                                type="button"
-                                @click="changeStatus(status)"
-                                :disabled="busy !== null"
-                                class="rounded-lg bg-burgundy-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-burgundy-700 disabled:opacity-60"
-                                x-text="busy === 'status:' + status ? 'Memproses…' : transitionLabel(status)"
-                            ></button>
-                        </template>
-                        <button x-show="task.abilities.update" type="button" @click="editTask()" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">Edit</button>
-                        <button x-show="task.abilities.delete" type="button" @click="deleteTask()" :disabled="busy !== null" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-60">Hapus</button>
                     </div>
 
                     <p x-show="task.evidence_required && task.status === 'in_progress' && task.evidences.length === 0 && transitions.length > 0" class="text-xs text-amber-700">
