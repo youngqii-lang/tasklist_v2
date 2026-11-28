@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\TaskStatus;
 use Illuminate\Http\Request;
 
 /**
@@ -21,7 +20,6 @@ class TaskPreviewResource extends TaskResource
         return [
             ...parent::toArray($request),
             'description' => $this->description,
-            'is_overdue' => $this->status !== TaskStatus::Done && $this->deadline !== null && $this->deadline->lt(today()),
         ];
     }
 }

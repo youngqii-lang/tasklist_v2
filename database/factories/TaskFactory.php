@@ -34,8 +34,9 @@ class TaskFactory extends Factory
             'status' => TaskStatus::Backlog,
             'start_date' => $startDate,
             'deadline' => $startDate ? fake()->dateTimeBetween($startDate, '+1 month') : null,
-            'requires_review' => fake()->boolean(),
-            'evidence_required' => fake()->boolean(),
+            'deadline_time' => $startDate ? fake()->randomElement(['09:00', '12:00', '17:00', '23:59']) : null,
+            'requires_review' => true,
+            'evidence_required' => true,
         ];
     }
 

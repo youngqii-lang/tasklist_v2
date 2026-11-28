@@ -122,10 +122,10 @@
                                 <p class="text-sm font-medium text-slate-900" x-text="task.title"></p>
                                 <span class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
                             </div>
-                            <p class="mt-0.5 text-xs text-slate-500" x-text="task.division?.name + ' · ' + picNames(task)"></p>
+                            <p class="mt-0.5 text-xs text-slate-500" x-text="task.division?.name + (collaboratorBadge(task) ? ' ' + collaboratorBadge(task) : '') + ' · ' + picNames(task)"></p>
                             <div class="mt-1 flex flex-wrap items-center gap-2 text-xs">
                                 <span class="rounded-md px-1.5 py-0.5 font-medium ring-1" :class="statusBadge(task.status)" x-text="task.status_label"></span>
-                                <span :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'" x-text="formatDate(task.deadline) + (task.is_overdue ? ' · Terlambat' : '')"></span>
+                                <span :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'" x-text="formatDeadline(task) + (task.is_overdue ? ' · Terlambat' : '')"></span>
                             </div>
                         </button>
                     </li>
@@ -156,7 +156,7 @@
             <div>
                 <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                     <div><dt class="text-xs text-slate-500">Tanggal Mulai</dt><dd class="text-slate-800" x-text="preview.data.start_date ? formatDate(preview.data.start_date) : 'Belum ditentukan'"></dd></div>
-                    <div><dt class="text-xs text-slate-500">Deadline</dt><dd :class="preview.data.is_overdue ? 'font-semibold text-red-600' : 'text-slate-800'" x-text="preview.data.deadline ? formatDate(preview.data.deadline) + (preview.data.is_overdue ? ' · Terlambat' : '') : 'Belum ditentukan'"></dd></div>
+                    <div><dt class="text-xs text-slate-500">Deadline</dt><dd :class="preview.data.is_overdue ? 'font-semibold text-red-600' : 'text-slate-800'" x-text="preview.data.deadline ? formatDeadline(preview.data) + (preview.data.is_overdue ? ' · Terlambat' : '') : 'Belum ditentukan'"></dd></div>
                     <div class="col-span-2"><dt class="text-xs text-slate-500">PIC</dt><dd class="text-slate-800" x-text="picNames(preview.data)"></dd></div>
                     <div class="col-span-2"><dt class="text-xs text-slate-500">Status</dt><dd><span class="rounded-md px-2 py-0.5 text-xs font-medium ring-1" :class="statusBadge(preview.data.status)" x-text="preview.data.status_label"></span></dd></div>
                 </dl>

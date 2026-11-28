@@ -42,14 +42,20 @@ export function reviewDecisionFor(fromStatus, toStatus) {
     return null;
 }
 
-const todayString = () => {
-    const now = new Date();
-    const pad = (value) => String(value).padStart(2, '0');
+/** A deadline without its own time ends at the end of its day, as the API treats it. */
+const END_OF_DAY = '23:59';
 
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
+/** The moment the task's deadline ends, in local time, or null without a deadline. */
+export function deadlineMoment(task) {
+    if (!task.deadline) return null;
 
-export const isOverdue = (task) => task.status !== 'done' && Boolean(task.deadline) && task.deadline.slice(0, 10) < todayString();
+    const [year, month, day] = task.deadline.slice(0, 10).split('-').map(Number);
+    const [hour, minute] = (task.deadline_time || END_OF_DAY).split(':').map(Number);
+
+    return new Date(year, month - 1, day, hour, minute);
+}
+
+export const isOverdue = (task) => task.status !== 'done' && Boolean(task.deadline) && deadlineMoment(task) < new Date();
 
 /**
  * Where the account may move the task: the statuses the API lists for a detail, otherwise the one regular step when

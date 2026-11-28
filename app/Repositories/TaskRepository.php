@@ -72,17 +72,36 @@ class TaskRepository
     }
 
     /**
+     * SQL condition for an unfinished task whose deadline has passed at the given moment: its date is before today, or
+     * it is today and its time has passed. A deadline without a time ends at the end of its day. Deadlines are compared
+     * as a range so a stored time part on the date cannot hide a match.
+     *
+     * @return array{0: string, 1: array<int, string>}
+     */
+    public static function overdueCondition(CarbonInterface $now): array
+    {
+        $start = $now->toDateString();
+        $end = $now->copy()->addDay()->toDateString();
+
+        return [
+            'status <> ? and (deadline < ? or (deadline >= ? and deadline < ? and coalesce(deadline_time, ?) < ?))',
+            [TaskStatus::Done->value, $start, $start, $end, Task::END_OF_DAY.':59', $now->format('H:i:s')],
+        ];
+    }
+
+    /**
      * Monitoring counts in one query. An active task is any task not yet Done; tasks without a deadline are
-     * never Overdue or Due Today. Deadlines are compared as a range so a stored time part cannot hide a match.
+     * never Overdue or Due Today. Due Today is a deadline later today whose time has not passed yet.
      *
      * @param  Builder<Task>  $query
      * @return array<string, int>
      */
-    public function monitoringCounts(Builder $query, CarbonInterface $today): array
+    public function monitoringCounts(Builder $query, CarbonInterface $now): array
     {
         $done = TaskStatus::Done->value;
-        $start = $today->toDateString();
-        $end = $today->copy()->addDay()->toDateString();
+        $start = $now->toDateString();
+        $end = $now->copy()->addDay()->toDateString();
+        [$overdue, $overdueBindings] = self::overdueCondition($now);
 
         $select = (clone $query)->toBase()->selectRaw('count(*) as total_tasks');
 
@@ -92,8 +111,11 @@ class TaskRepository
 
         $row = $select
             ->selectRaw('coalesce(sum(case when status <> ? then 1 else 0 end), 0) as unfinished', [$done])
-            ->selectRaw('coalesce(sum(case when status <> ? and deadline < ? then 1 else 0 end), 0) as overdue', [$done, $start])
-            ->selectRaw('coalesce(sum(case when status <> ? and deadline >= ? and deadline < ? then 1 else 0 end), 0) as due_today', [$done, $start, $end])
+            ->selectRaw("coalesce(sum(case when {$overdue} then 1 else 0 end), 0) as overdue", $overdueBindings)
+            ->selectRaw(
+                'coalesce(sum(case when status <> ? and deadline >= ? and deadline < ? and coalesce(deadline_time, ?) >= ? then 1 else 0 end), 0) as due_today',
+                [$done, $start, $end, Task::END_OF_DAY.':59', $now->format('H:i:s')],
+            )
             ->selectRaw('coalesce(sum(case when status <> ? and priority = ? then 1 else 0 end), 0) as urgent', [$done, TaskPriority::Urgent->value])
             ->first();
 
@@ -106,16 +128,17 @@ class TaskRepository
      * @param  Builder<Task>  $query
      * @return array<int, array{total: int, completed: int, unfinished: int, overdue: int}>
      */
-    public function monitoringCountsByDivision(Builder $query, CarbonInterface $today): array
+    public function monitoringCountsByDivision(Builder $query, CarbonInterface $now): array
     {
         $done = TaskStatus::Done->value;
+        [$overdue, $overdueBindings] = self::overdueCondition($now);
 
         return (clone $query)->toBase()
             ->select('division_id')
             ->selectRaw('count(*) as total')
             ->selectRaw('coalesce(sum(case when status = ? then 1 else 0 end), 0) as completed', [$done])
             ->selectRaw('coalesce(sum(case when status <> ? then 1 else 0 end), 0) as unfinished', [$done])
-            ->selectRaw('coalesce(sum(case when status <> ? and deadline < ? then 1 else 0 end), 0) as overdue', [$done, $today->toDateString()])
+            ->selectRaw("coalesce(sum(case when {$overdue} then 1 else 0 end), 0) as overdue", $overdueBindings)
             ->groupBy('division_id')
             ->get()
             ->mapWithKeys(fn (object $row) => [(int) $row->division_id => [
@@ -159,8 +182,9 @@ class TaskRepository
     private function filter(Builder $query, array $filters): Builder
     {
         return $query
-            ->when($filters['division'], fn (Builder $query, string $division) => $query
-                ->whereHas('division', fn (Builder $query) => $query->where('code_division', $division)))
+            ->when($filters['division'], fn (Builder $query, string $division) => $query->where(fn (Builder $query) => $query
+                ->whereHas('division', fn (Builder $query) => $query->where('code_division', $division))
+                ->orWhereHas('collaboratingDivisions', fn (Builder $query) => $query->where('code_division', $division))))
             ->when($filters['search'], fn (Builder $query, string $search) => $query->where('title', 'like', "%{$search}%"))
             ->when($filters['priority'], fn (Builder $query, string $priority) => $query->where('priority', $priority))
             ->when($filters['status'], fn (Builder $query, string $status) => $query->where('status', $status))
@@ -198,9 +222,10 @@ class TaskRepository
     public function deadlinesBetween(Account $account, CarbonInterface $from, CarbonInterface $to, ?string $division): Collection
     {
         return $this->visible($account, ['search' => null, 'division' => $division, 'priority' => null, 'status' => null])
-            ->with(['division', 'pics'])
+            ->with(['division', 'collaboratingDivisions', 'pics'])
             ->whereBetween('deadline', [$from->copy()->startOfDay()->toDateTimeString(), $to->copy()->endOfDay()->toDateTimeString()])
             ->orderBy('deadline')
+            ->orderBy('deadline_time')
             ->orderBy('id')
             ->get();
     }
@@ -247,7 +272,8 @@ class TaskRepository
                 $direction,
             ),
             // Tasks without a date always come last, whichever the direction.
-            'start_date', 'deadline' => $query->orderByRaw("{$sort} is null")->orderBy($sort, $direction),
+            'start_date' => $query->orderByRaw('start_date is null')->orderBy('start_date', $direction),
+            'deadline' => $query->orderByRaw('deadline is null')->orderBy('deadline', $direction)->orderBy('deadline_time', $direction),
             default => $query->orderBy($sort, $direction),
         };
 

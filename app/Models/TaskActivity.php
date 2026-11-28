@@ -70,6 +70,7 @@ class TaskActivity extends Model
         'description' => 'Deskripsi',
         'category' => 'Kategori',
         'division' => 'Divisi',
+        'collaborating_divisions' => 'Divisi kolaborator',
         'platform' => 'Platform',
         'pic' => 'PIC',
         'pics' => 'PIC',
@@ -77,6 +78,7 @@ class TaskActivity extends Model
         'status' => 'Status',
         'start_date' => 'Tanggal mulai',
         'deadline' => 'Deadline',
+        'deadline_time' => 'Jam deadline',
         'requires_review' => 'Wajib review',
         'evidence_required' => 'Wajib evidence',
     ];

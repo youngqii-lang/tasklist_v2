@@ -25,6 +25,8 @@ class UpdateTaskRequest extends StoreTaskRequest
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'category_id' => ['sometimes', 'nullable', 'integer', Rule::exists('task_categories', 'id')],
             'division_id' => ['sometimes', 'required', 'integer', Rule::exists('divisions', 'id')],
+            'collaborating_division_ids' => ['sometimes', 'nullable', 'array'],
+            'collaborating_division_ids.*' => ['integer', 'distinct', Rule::exists('divisions', 'id')],
             'platform_id' => ['sometimes', 'nullable', 'integer', Rule::exists('platforms', 'id')],
             'priority' => ['sometimes', 'required', Rule::in(array_column(TaskPriority::cases(), 'value'))],
             'status' => ['sometimes', 'required', Rule::in(array_column(TaskStatus::cases(), 'value'))],
@@ -36,7 +38,7 @@ class UpdateTaskRequest extends StoreTaskRequest
                 // An existing deadline that has already passed may stay; only a new deadline must not be in the past.
                 ...($this->deadlineChanged() ? ['after_or_equal:today'] : []),
             ],
-            'requires_review' => ['sometimes', 'boolean'],
+            'deadline_time' => ['sometimes', 'nullable', 'date_format:H:i'],
         ];
     }
 
@@ -85,6 +87,24 @@ class UpdateTaskRequest extends StoreTaskRequest
                         $errors->add('deadline', 'Deadline tidak boleh sebelum tanggal mulai.');
                     }
                 }
+
+                if ($errors->hasAny(['deadline', 'deadline_time']) || ! $this->hasAny(['deadline', 'deadline_time'])) {
+                    return;
+                }
+
+                $deadline = $this->has('deadline') ? $this->input('deadline') : $this->task()->deadline?->toDateString();
+                $time = $this->has('deadline_time') ? $this->input('deadline_time') : $this->task()->deadline_time;
+
+                if ($deadline !== null && ($time === null || $time === '')) {
+                    $errors->add('deadline_time', 'Jam deadline wajib diisi bersama tanggal deadline.');
+
+                    return;
+                }
+
+                // An existing deadline that has already passed may stay; only a new date or time must not be in the past.
+                if ($deadline !== null && ($this->deadlineChanged() || $this->deadlineTimeChanged())) {
+                    $this->rejectPastDeadline($validator, $deadline, $time);
+                }
             },
         ];
     }
@@ -92,6 +112,11 @@ class UpdateTaskRequest extends StoreTaskRequest
     private function deadlineChanged(): bool
     {
         return $this->filled('deadline') && $this->input('deadline') !== $this->task()->deadline?->toDateString();
+    }
+
+    private function deadlineTimeChanged(): bool
+    {
+        return $this->filled('deadline_time') && $this->input('deadline_time') !== $this->task()->deadline_time;
     }
 
     private function task(): Task

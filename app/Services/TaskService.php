@@ -46,7 +46,7 @@ class TaskService
         $query = $this->tasks->visible($account, $filters);
         $statusCounts = $this->tasks->countByStatus($query);
 
-        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'pics'])->withCount('evidences');
+        $query = $this->tasks->sort($query, $sort, $direction)->with(['division', 'collaboratingDivisions', 'pics'])->withCount('evidences');
 
         return [
             'tasks' => $perPage ? $query->paginate($perPage)->withQueryString() : $query->get(),
@@ -59,21 +59,21 @@ class TaskService
      */
     public function preview(Task $task): Task
     {
-        return $task->refresh()->load(['division', 'pics'])->loadCount('evidences');
+        return $task->refresh()->load(['division', 'collaboratingDivisions', 'pics'])->loadCount('evidences');
     }
 
     public function detail(Task $task): Task
     {
         return $task->load([
-            'category', 'division', 'platform', 'pics', 'creator', 'activities.actor', 'evidences.submitter', 'reviews.reviewer',
+            'category', 'division', 'collaboratingDivisions', 'platform', 'pics', 'creator', 'activities.actor', 'evidences.submitter', 'reviews.reviewer',
             'assignments.account', 'assignments.assigner', 'assignments.unassigner',
         ])->loadCount('evidences');
     }
 
     /**
      * Create a task from validated input. The creator is the logged-in account, the status starts at
-     * Back Log unless To Do is chosen, and review is required whenever the category requires it. Each chosen PIC gets an
-     * active assignment made by the creator.
+     * Back Log unless To Do is chosen, and every task requires review and evidence. Each chosen PIC gets an active
+     * assignment made by the creator, and the PICs' divisions become collaborating divisions next to the chosen ones.
      *
      * @param  array<string, mixed>  $data
      *
@@ -86,19 +86,25 @@ class TaskService
     public function create(Account $creator, array $data): Task
     {
         $picIds = $this->picIds($data['pic_ids'] ?? []);
-        unset($data['pic_ids']);
+        $collaboratorIds = $this->picIds($data['collaborating_division_ids'] ?? []);
+        unset($data['pic_ids'], $data['collaborating_division_ids']);
 
         $attributes = [
             ...$data,
             'creator_id' => $creator->id,
             'priority' => $data['priority'] ?? TaskPriority::Medium->value,
             'status' => $data['status'] ?? TaskStatus::Backlog->value,
-            'requires_review' => $this->requiresReview($data),
-            'evidence_required' => $this->evidenceRequired($data),
+            'deadline_time' => isset($data['deadline']) ? ($data['deadline_time'] ?? null) : null,
+            'requires_review' => true,
+            'evidence_required' => true,
         ];
 
         $lock = Cache::lock(
-            $this->submissionFingerprint([...$attributes, 'pic_ids' => $picIds->sort()->values()->all()]),
+            $this->submissionFingerprint([
+                ...$attributes,
+                'pic_ids' => $picIds->sort()->values()->all(),
+                'collaborating_division_ids' => $collaboratorIds->sort()->values()->all(),
+            ]),
             self::DUPLICATE_WINDOW_SECONDS,
         );
 
@@ -107,13 +113,15 @@ class TaskService
         }
 
         try {
-            $task = DB::transaction(function () use ($creator, $attributes, $picIds) {
+            $task = DB::transaction(function () use ($creator, $attributes, $picIds, $collaboratorIds) {
                 $task = Task::create($attributes);
                 $now = now();
 
                 foreach ($picIds as $picId) {
                     $task->assignments()->create(['account_id' => $picId, 'assigned_by' => $creator->id, 'assigned_at' => $now]);
                 }
+
+                $this->syncCollaborators($task, $creator, $this->collaboratorTarget($task, $collaboratorIds->all()));
 
                 $task->activities()->create(['account_id' => $creator->id, 'action' => TaskActivity::CREATED]);
 
@@ -144,9 +152,10 @@ class TaskService
     public function update(Account $editor, Task $task, array $data): Task
     {
         $baseVersion = (int) $data['version'];
-        unset($data['version']);
+        $chosenCollaborators = array_key_exists('collaborating_division_ids', $data) ? ($data['collaborating_division_ids'] ?? []) : null;
+        unset($data['version'], $data['collaborating_division_ids']);
 
-        DB::transaction(function () use ($editor, $task, $data, $baseVersion) {
+        DB::transaction(function () use ($editor, $task, $data, $baseVersion, $chosenCollaborators) {
             $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->version !== $baseVersion) {
@@ -158,12 +167,20 @@ class TaskService
             $statusDenial = $this->statusDenial($editor, $locked, $data['status'] ?? null);
 
             $locked->fill($data);
-            // Report a locked field before the category's review rule, which may also reject it.
-            $this->rejectLockedChanges($locked, $lockedFields);
-            $this->applyCategoryReview($locked, $data);
-            $this->applyCategoryEvidence($locked);
 
-            if (! $locked->isDirty()) {
+            if ($locked->deadline === null) {
+                $locked->deadline_time = null;
+            }
+
+            $this->rejectLockedChanges($locked, $lockedFields);
+
+            if ($chosenCollaborators !== null && isset($lockedFields['collaborating_division_ids'])) {
+                throw ValidationException::withMessages(['collaborating_division_ids' => $lockedFields['collaborating_division_ids']]);
+            }
+
+            $collaborators = $this->collaboratorTarget($locked, $chosenCollaborators);
+
+            if (! $locked->isDirty() && $collaborators->all() === $this->collaboratorIds($locked)->all()) {
                 return;
             }
 
@@ -175,14 +192,11 @@ class TaskService
 
             $resubmitted = $locked->isDirty('status') && $locked->resubmitsTo($locked->status);
             $changes = $this->describeChanges($locked);
-            $divisionMoved = $locked->isDirty('division_id');
 
             $locked->version = $baseVersion + 1;
             $locked->save();
 
-            if ($divisionMoved) {
-                $this->dropOwnerFromCollaborators($locked);
-            }
+            $changes += $this->syncCollaborators($locked, $editor, $collaborators);
 
             $locked->activities()->create([
                 'account_id' => $editor->id,
@@ -364,9 +378,8 @@ class TaskService
             $locked->version = $baseVersion + 1;
             $locked->save();
 
-            if ($forwarded) {
-                $this->dropOwnerFromCollaborators($locked);
-            }
+            // New PICs bring their divisions along; a forwarded task's new owner stops being a collaborator.
+            $changes += $this->syncCollaborators($locked, $actor, $this->collaboratorTarget($locked, null));
 
             $locked->activities()->create([
                 'account_id' => $actor->id,
@@ -425,6 +438,12 @@ class TaskService
                 ->map(fn (Division $division) => $division->only(['id', 'code_division', 'name']))
                 ->all(),
             'pics' => $this->picOptions($account),
+            // Any division may collaborate on a task, also one the account cannot create tasks for.
+            'collaborator_divisions' => Division::query()
+                ->orderBy('name')
+                ->get(['id', 'code_division', 'name'])
+                ->map(fn (Division $division) => $division->only(['id', 'code_division', 'name']))
+                ->all(),
             'categories' => TaskCategory::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'requires_review', 'evidence_required'])
@@ -498,11 +517,79 @@ class TaskService
     }
 
     /**
-     * A task's owning division is never also one of its collaborating divisions.
+     * The task's collaborating division ids as they are stored, in ascending order.
+     *
+     * @return SupportCollection<int, int>
      */
-    private function dropOwnerFromCollaborators(Task $task): void
+    private function collaboratorIds(Task $task): SupportCollection
     {
-        $task->collaboratingDivisions()->detach($task->division_id);
+        return $task->collaboratingDivisions()->pluck('divisions.id')->map(fn (int|string $id) => (int) $id)->sort()->values();
+    }
+
+    /**
+     * The collaborating divisions the task should have: the chosen ones (or the current ones when none are sent) plus
+     * the divisions of its active PICs, never its owning division. In ascending order.
+     *
+     * @param  array<int, int|string>|null  $chosenIds
+     * @return SupportCollection<int, int>
+     */
+    private function collaboratorTarget(Task $task, ?array $chosenIds): SupportCollection
+    {
+        $picDivisionIds = Account::query()
+            ->whereIn('id', $task->activeAssignments()->select('account_id'))
+            ->whereNotNull('division_id')
+            ->pluck('division_id');
+
+        return collect($chosenIds ?? $this->collaboratorIds($task)->all())
+            ->merge($picDivisionIds)
+            ->map(fn (int|string $id) => (int) $id)
+            ->unique()
+            ->reject(fn (int $id) => $id === (int) $task->division_id)
+            ->sort()
+            ->values();
+    }
+
+    /**
+     * Store the given collaborating divisions, recording who added the new ones, and describe the change for the
+     * history (nothing when they stay the same).
+     *
+     * @param  SupportCollection<int, int>  $target
+     * @return array<string, array{old: array<int, array{id: int, name: string}>, new: array<int, array{id: int, name: string}>}>
+     */
+    private function syncCollaborators(Task $task, Account $actor, SupportCollection $target): array
+    {
+        $current = $this->collaboratorIds($task);
+
+        if ($target->all() === $current->all()) {
+            return [];
+        }
+
+        $task->collaboratingDivisions()->detach($current->diff($target)->all());
+
+        foreach ($target->diff($current) as $divisionId) {
+            $task->collaboratingDivisions()->attach($divisionId, ['added_by' => $actor->id]);
+        }
+
+        return ['collaborating_divisions' => [
+            'old' => $this->divisionReferences($current),
+            'new' => $this->divisionReferences($target),
+        ]];
+    }
+
+    /**
+     * Divisions as they are recorded in the history: id and name at the time of the change, by name.
+     *
+     * @param  SupportCollection<int, int>  $ids
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function divisionReferences(SupportCollection $ids): array
+    {
+        return Division::query()
+            ->whereKey($ids->all())
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Division $division) => ['id' => $division->id, 'name' => $division->name])
+            ->all();
     }
 
     /**
@@ -520,67 +607,6 @@ class TaskService
             ->all();
 
         return 'task-create:'.sha1(json_encode($normalized));
-    }
-
-    /**
-     * A category that requires review always does; otherwise review is required only when the creator asks for it.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    private function requiresReview(array $data): bool
-    {
-        $categoryRequiresReview = isset($data['category_id'])
-            && TaskCategory::whereKey($data['category_id'])->value('requires_review');
-
-        return $categoryRequiresReview || (bool) ($data['requires_review'] ?? false);
-    }
-
-    /**
-     * A category that requires evidence always does; otherwise evidence is required only when the creator asks for it.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    private function evidenceRequired(array $data): bool
-    {
-        $categoryRequiresEvidence = isset($data['category_id'])
-            && TaskCategory::whereKey($data['category_id'])->value('evidence_required');
-
-        return $categoryRequiresEvidence || (bool) ($data['evidence_required'] ?? false);
-    }
-
-    /**
-     * Moving the task to a category that requires evidence makes evidence required; leaving such a category
-     * keeps the requirement, since it may already have been communicated to the PIC.
-     */
-    private function applyCategoryEvidence(Task $task): void
-    {
-        if ($task->isDirty('category_id') && $task->category_id !== null
-            && TaskCategory::whereKey($task->category_id)->value('evidence_required')) {
-            $task->evidence_required = true;
-        }
-    }
-
-    /**
-     * A category that requires review keeps review required: choosing such a category turns it on, and it cannot be
-     * turned off while the task has one.
-     *
-     * @param  array<string, mixed>  $data
-     *
-     * @throws ValidationException
-     */
-    private function applyCategoryReview(Task $task, array $data): void
-    {
-        if ($task->category_id === null || ! TaskCategory::whereKey($task->category_id)->value('requires_review')) {
-            return;
-        }
-
-        if (array_key_exists('requires_review', $data) && ! $data['requires_review']) {
-            throw ValidationException::withMessages(['requires_review' => 'Kategori tugas ini mewajibkan review.']);
-        }
-
-        if ($task->isDirty('category_id')) {
-            $task->requires_review = true;
-        }
     }
 
     /**
@@ -654,6 +680,12 @@ class TaskService
                         'old' => $this->reference($model, $column, $task->getOriginal($field)),
                         'new' => $this->reference($model, $column, $task->{$field}),
                     ]];
+                }
+
+                if ($field === 'deadline_time') {
+                    $original = $task->getRawOriginal($field);
+
+                    return [$field => ['old' => $original === null ? null : substr($original, 0, 5), 'new' => $task->deadline_time]];
                 }
 
                 return [$field => [

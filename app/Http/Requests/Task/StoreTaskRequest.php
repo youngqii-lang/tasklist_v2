@@ -9,7 +9,9 @@ use App\Models\Division;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreTaskRequest extends FormRequest
 {
@@ -35,6 +37,8 @@ class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:5000'],
             'category_id' => ['nullable', 'integer', Rule::exists('task_categories', 'id')],
             'division_id' => ['required', 'integer', Rule::exists('divisions', 'id'), $this->creatableDivision()],
+            'collaborating_division_ids' => ['nullable', 'array'],
+            'collaborating_division_ids.*' => ['integer', 'distinct', Rule::exists('divisions', 'id')],
             'platform_id' => ['nullable', 'integer', Rule::exists('platforms', 'id')],
             'pic_ids' => [
                 'nullable',
@@ -52,8 +56,7 @@ class StoreTaskRequest extends FormRequest
                 'after_or_equal:today',
                 ...($this->filled('start_date') ? ['after_or_equal:start_date'] : []),
             ],
-            'requires_review' => ['nullable', 'boolean'],
-            'evidence_required' => ['nullable', 'boolean'],
+            'deadline_time' => ['nullable', 'required_with:deadline', 'date_format:H:i'],
         ];
     }
 
@@ -79,6 +82,10 @@ class StoreTaskRequest extends FormRequest
             'status.in' => ':attribute harus Back Log atau To Do.',
             'date_format' => ':attribute harus berformat YYYY-MM-DD.',
             'deadline.after_or_equal' => 'Deadline tidak boleh sebelum hari ini atau sebelum tanggal mulai.',
+            'deadline_time.required_with' => 'Jam deadline wajib diisi bersama tanggal deadline.',
+            'deadline_time.date_format' => 'Jam deadline harus berformat JJ:MM.',
+            'collaborating_division_ids.array' => 'Divisi kolaborator tidak valid.',
+            'collaborating_division_ids.*.distinct' => 'Divisi kolaborator yang sama dipilih lebih dari sekali.',
         ];
     }
 
@@ -101,9 +108,36 @@ class StoreTaskRequest extends FormRequest
             'status' => 'Status awal',
             'start_date' => 'Tanggal mulai',
             'deadline' => 'Deadline',
-            'requires_review' => 'Kewajiban review',
-            'evidence_required' => 'Kewajiban evidence',
+            'deadline_time' => 'Jam deadline',
+            'collaborating_division_ids' => 'Divisi kolaborator',
+            'collaborating_division_ids.*' => 'Divisi kolaborator',
         ];
+    }
+
+    /**
+     * A deadline set for today must not end at a time that has already passed.
+     *
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                if (! $validator->errors()->hasAny(['deadline', 'deadline_time']) && $this->filled(['deadline', 'deadline_time'])) {
+                    $this->rejectPastDeadline($validator, $this->input('deadline'), $this->input('deadline_time'));
+                }
+            },
+        ];
+    }
+
+    /**
+     * Add an error when the deadline's date and time lie in the past.
+     */
+    protected function rejectPastDeadline(Validator $validator, string $date, string $time): void
+    {
+        if (Carbon::createFromFormat('!Y-m-d H:i', "{$date} {$time}")->isPast()) {
+            $validator->errors()->add('deadline_time', 'Jam deadline sudah lewat. Pilih jam yang belum terlewati.');
+        }
     }
 
     /**

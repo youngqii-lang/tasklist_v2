@@ -89,7 +89,10 @@
                                     <p class="line-clamp-2 flex-1 text-sm font-semibold text-slate-900" x-text="task.title"></p>
                                     <span class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
                                 </div>
-                                <p class="mt-1 truncate text-xs text-slate-500" x-text="task.division?.name"></p>
+                                <p class="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-500" :title="divisionNames(task)">
+                                    <span class="truncate" x-text="task.division?.name"></span>
+                                    <span x-show="collaboratorBadge(task)" class="shrink-0 rounded bg-slate-100 px-1.5 py-px text-[10px] font-medium text-slate-600" x-text="collaboratorBadge(task)"></span>
+                                </p>
                                 <p class="mt-2 flex items-center gap-1.5 truncate text-xs text-slate-600">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 shrink-0 text-slate-400"><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></svg>
                                     <span class="truncate" x-text="picNames(task)"></span>
@@ -108,7 +111,7 @@
                                         :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
-                                        <span x-text="formatDate(task.deadline)"></span>
+                                        <span x-text="formatDeadline(task)"></span>
                                         <span x-show="task.is_overdue">· Terlambat</span>
                                     </span>
                                 </div>

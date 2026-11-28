@@ -25,20 +25,20 @@ class TaskMonitoringService
     /**
      * Monitoring KPIs, completion rate, and per-division and per-priority breakdowns under the given scope and
      * filters. Read-only: seeing a task here grants no right to edit it. The period only decides which tasks
-     * are counted; Overdue and Due Today are always judged on the deadline against today.
+     * are counted; Overdue and Due Today are always judged on the deadline date and time against now.
      *
      * @param  array{search: ?string, division: ?string, priority: ?string, status: ?string, task_scope?: string, pic_id?: ?int, period?: ?TaskPeriod, date_basis: string, date_from: ?string, date_to: ?string}  $filters
      * @return array<string, mixed>
      */
     public function summarize(Account $account, string $scope, array $filters): array
     {
-        $today = CarbonImmutable::today();
+        $now = CarbonImmutable::now();
         $query = $this->tasks->monitored($account, $scope, $filters);
-        $counts = $this->tasks->monitoringCounts($query, $today);
+        $counts = $this->tasks->monitoringCounts($query, $now);
 
         return [
             'scope' => $this->scope($scope, $filters['task_scope'] ?? null),
-            'as_of' => $today->toDateString(),
+            'as_of' => $now->toDateString(),
             'filters' => [...$filters, 'period' => ($filters['period'] ?? null)?->toArray()],
             'period' => $this->period($filters),
             'metrics' => [
@@ -46,7 +46,7 @@ class TaskMonitoringService
                 'completion_rate' => $this->completionRate($counts['completed'], $counts['total_tasks']),
             ],
             'by_priority' => $this->tasks->monitoringCountsByPriority($query),
-            'by_division' => $this->byDivision($this->tasks->monitoringCountsByDivision($query, $today)),
+            'by_division' => $this->byDivision($this->tasks->monitoringCountsByDivision($query, $now)),
         ];
     }
 

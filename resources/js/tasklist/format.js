@@ -85,6 +85,27 @@ export function formatDateTime(value) {
     return value ? dateTimeFormatter.format(new Date(value)) : '—';
 }
 
+/** A task's deadline as "5 Des 2026, 17.30", or only the date when it has no time. */
+export function formatDeadline(task) {
+    if (!task?.deadline) return '—';
+
+    const date = formatDate(task.deadline);
+
+    return task.deadline_time ? `${date}, ${task.deadline_time.replace(':', '.')}` : date;
+}
+
+/** The divisions a task belongs to besides its owner, as "+2 divisi"; empty when there are none. */
+export function collaboratorBadge(task) {
+    const count = task?.collaborating_divisions?.length ?? 0;
+
+    return count ? `+${count} divisi` : '';
+}
+
+/** Every division a task belongs to, owner first, for titles and the detail panel. */
+export function divisionNames(task) {
+    return [task?.division?.name, ...(task?.collaborating_divisions ?? []).map((division) => division.name)].filter(Boolean).join(', ');
+}
+
 export function formatFileSize(bytes) {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -107,8 +128,11 @@ export const formatting = {
     priorityBadge: (priority) => PRIORITY_BADGES[priority] ?? PRIORITY_BADGES.medium,
     formatDate,
     formatDateTime,
+    formatDeadline,
     formatFileSize,
     picNames,
+    collaboratorBadge,
+    divisionNames,
 };
 
 /** Action labels for moving a task to a status, shared by the Board move menu and the detail panel. */

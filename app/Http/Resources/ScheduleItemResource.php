@@ -40,6 +40,8 @@ class ScheduleItemResource extends JsonResource
             'end_date' => ($isTask ? $this->deadline : $this->end_at)?->toDateString(),
             'status' => $isTask ? $this->status->value : null,
             'priority' => $isTask ? $this->priority->value : null,
+            'deadline_time' => $task?->deadline_time,
+            'is_overdue' => $task?->isOverdue() ?? false,
             'task_id' => $task?->id,
             'can_view_detail' => $task !== null && $request->user()->can('view', $task),
         ];

@@ -13,15 +13,18 @@ const emptyForm = () => ({
     status: 'backlog',
     start_date: '',
     deadline: '',
-    requires_review: false,
-    evidence_required: false,
+    deadline_time: '',
+    collaborating_division_ids: [],
 });
 
 const nullable = (value) => (value === '' || value === undefined ? null : value);
 const toId = (value) => (value === '' || value === null || value === undefined ? null : Number(value));
 
 /** Fields of the edit form, as the API names them in editable_fields. */
-const EDIT_FIELDS = ['title', 'description', 'category_id', 'division_id', 'platform_id', 'priority', 'start_date', 'deadline', 'requires_review'];
+const EDIT_FIELDS = [
+    'title', 'description', 'category_id', 'division_id', 'collaborating_division_ids', 'platform_id', 'priority',
+    'start_date', 'deadline', 'deadline_time',
+];
 
 /**
  * Create and edit dialog. Options come from GET /api/tasks/create-options; on edit the fields shown and sent follow
@@ -62,8 +65,38 @@ export default (config) => ({
         return this.canEdit('division_id');
     },
 
-    get selectedCategory() {
-        return this.options?.categories.find((category) => String(category.id) === String(this.form.category_id)) ?? null;
+    /** Divisions of the chosen PICs (or, on edit, of the task's PICs): they always collaborate on the task. */
+    get picDivisionIds() {
+        if (this.isEdit) return (this.task?.pics ?? []).map((pic) => pic.division_id).filter(Boolean);
+
+        return (this.options?.pics ?? [])
+            .filter((pic) => this.form.pic_ids.includes(pic.id) && pic.division)
+            .map((pic) => pic.division.id);
+    },
+
+    /** Every division except the owning one, each marked when a PIC brings it along. */
+    get collaboratorChoices() {
+        const fromPics = this.picDivisionIds;
+
+        return (this.options?.collaborator_divisions ?? [])
+            .filter((division) => String(division.id) !== String(this.form.division_id))
+            .map((division) => ({ ...division, fromPic: fromPics.includes(division.id) }));
+    },
+
+    isCollaborator(division) {
+        return division.fromPic || this.form.collaborating_division_ids.includes(division.id);
+    },
+
+    toggleCollaborator(division) {
+        if (division.fromPic) return;
+
+        const ids = this.form.collaborating_division_ids;
+        this.form.collaborating_division_ids = ids.includes(division.id) ? ids.filter((id) => id !== division.id) : [...ids, division.id];
+    },
+
+    /** The deadline time is filled in with the deadline; clearing the date clears the time too. */
+    onDeadlineChange() {
+        if (!this.form.deadline) this.form.deadline_time = '';
     },
 
     /** PIC choices: the chosen division's accounts (or all), matching the search, with the chosen ones first. */
@@ -139,8 +172,8 @@ export default (config) => ({
             status: task.status,
             start_date: task.start_date ?? '',
             deadline: task.deadline ?? '',
-            requires_review: Boolean(task.requires_review),
-            evidence_required: Boolean(task.evidence_required),
+            deadline_time: task.deadline_time ?? '',
+            collaborating_division_ids: (task.collaborating_divisions ?? []).map((division) => division.id),
         };
     },
 
@@ -158,14 +191,6 @@ export default (config) => ({
         } finally {
             this.optionsLoading = false;
         }
-    },
-
-    /** The category decides whether review (and evidence) is required. */
-    onCategoryChange() {
-        if (!this.selectedCategory) return;
-
-        this.form.requires_review = Boolean(this.selectedCategory.requires_review);
-        if (this.selectedCategory.evidence_required) this.form.evidence_required = true;
     },
 
     /** PICs outside the new division are dropped unless the user chose to see every division. */
@@ -196,8 +221,8 @@ export default (config) => ({
             status: this.form.status,
             start_date: nullable(this.form.start_date),
             deadline: nullable(this.form.deadline),
-            requires_review: this.form.requires_review,
-            evidence_required: this.form.evidence_required,
+            deadline_time: this.form.deadline ? nullable(this.form.deadline_time) : null,
+            collaborating_division_ids: this.selectedCollaboratorIds(),
         };
     },
 
@@ -212,7 +237,8 @@ export default (config) => ({
             priority: this.form.priority,
             start_date: nullable(this.form.start_date),
             deadline: nullable(this.form.deadline),
-            requires_review: this.form.requires_review,
+            deadline_time: this.form.deadline ? nullable(this.form.deadline_time) : null,
+            collaborating_division_ids: this.selectedCollaboratorIds(),
         };
         const payload = { version: this.task.version };
 
@@ -225,9 +251,17 @@ export default (config) => ({
             delete payload.category_id;
             delete payload.platform_id;
             delete payload.division_id;
+            delete payload.collaborating_division_ids;
         }
 
         return payload;
+    },
+
+    /** Only the divisions picked by hand are sent; the API adds the PICs' divisions itself. */
+    selectedCollaboratorIds() {
+        const owner = String(this.form.division_id);
+
+        return this.form.collaborating_division_ids.filter((id) => String(id) !== owner);
     },
 
     async submit() {

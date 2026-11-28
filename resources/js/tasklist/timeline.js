@@ -173,7 +173,7 @@ export default (config, filters = {}) => ({
                     start,
                     end,
                     status_label: STATUS_LABELS[item.status] ?? item.status,
-                    isOverdue: item.status !== 'done' && end < today,
+                    isOverdue: item.is_overdue ?? (item.status !== 'done' && end < today),
                 });
             });
             this.events = data.filter((item) => item.type === 'event').map((item) => this.withPlacement({ ...item, ...span(item) }));

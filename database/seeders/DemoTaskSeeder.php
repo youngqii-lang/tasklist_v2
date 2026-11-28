@@ -101,8 +101,9 @@ class DemoTaskSeeder extends Seeder
             'status' => $status,
             'start_date' => self::day($definition['start']),
             'deadline' => $deadline,
-            'requires_review' => $category->requires_review,
-            'evidence_required' => $category->evidence_required,
+            'deadline_time' => $deadline === null ? null : '17:00',
+            'requires_review' => true,
+            'evidence_required' => true,
             'completed_at' => $status === TaskStatus::Done ? $deadline->copy()->subDay()->setTime(16, 0) : null,
         ]);
 

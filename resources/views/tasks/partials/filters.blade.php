@@ -1,12 +1,29 @@
 @php
     $fieldClass = 'w-full rounded-lg border border-burgundy-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-burgundy-500 focus:ring-2 focus:ring-burgundy-200';
+    $labelClass = 'mb-1 block text-xs font-medium text-slate-500';
     $periodModes = ['' => 'Semua periode', 'date' => 'Tanggal', 'month' => 'Bulan', 'year' => 'Tahun', 'range' => 'Rentang'];
 @endphp
 
 <form @submit.prevent="applyFilters()" class="mt-4 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-burgundy-100" role="search">
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto]">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-burgundy-600" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
+            Filter
+            <span x-show="activeFilterChips.length" x-cloak class="rounded-full bg-burgundy-600 px-2 py-0.5 text-[10px] font-semibold text-white" x-text="activeFilterChips.length + ' aktif'"></span>
+        </h2>
+        <button
+            type="button"
+            @click="resetFilters()"
+            :disabled="!hasActiveFilters && sort === 'created_at' && direction === 'desc'"
+            class="rounded-lg px-3 py-1.5 text-xs font-semibold text-burgundy-700 ring-1 ring-burgundy-200 transition hover:bg-burgundy-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+            Reset Filter
+        </button>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
         <div x-show="usesTaskFilters" class="sm:col-span-2 lg:col-span-1">
-            <label for="task-search" class="sr-only">Cari judul tugas</label>
+            <label for="task-search" class="{{ $labelClass }}">Cari judul</label>
             <div class="relative">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400">
                     <circle cx="11" cy="11" r="7" />
@@ -18,14 +35,14 @@
                     x-model="filters.search"
                     @input.debounce.400ms="applyFilters()"
                     maxlength="150"
-                    placeholder="Cari judul tugas…"
+                    placeholder="Ketik judul tugas…"
                     class="{{ $fieldClass }} pl-9"
                 >
             </div>
         </div>
 
         <div :class="usesTaskFilters ? '' : 'sm:col-span-2 lg:col-span-5'">
-            <label for="task-division" class="sr-only">Divisi</label>
+            <label for="task-division" class="{{ $labelClass }}" title="Termasuk tugas yang divisi ini ikut kerjakan sebagai kolaborator.">Divisi</label>
             <select id="task-division" x-model="filters.division" @change="applyFilters()" class="{{ $fieldClass }}">
                 <option value="">Semua Divisi</option>
                 <template x-for="division in meta.divisions" :key="division.code_division">
@@ -35,7 +52,7 @@
         </div>
 
         <div x-show="usesTaskFilters">
-            <label for="task-pic" class="sr-only">PIC</label>
+            <label for="task-pic" class="{{ $labelClass }}">PIC</label>
             <select id="task-pic" x-model="filters.pic_id" @change="applyFilters()" class="{{ $fieldClass }}">
                 <option value="">Semua PIC</option>
                 <template x-for="pic in meta.pics" :key="pic.id">
@@ -45,7 +62,7 @@
         </div>
 
         <div x-show="usesTaskFilters">
-            <label for="task-priority" class="sr-only">Prioritas</label>
+            <label for="task-priority" class="{{ $labelClass }}">Prioritas</label>
             <select id="task-priority" x-model="filters.priority" @change="applyFilters()" class="{{ $fieldClass }}">
                 <option value="">Semua Prioritas</option>
                 <template x-for="priority in config.priorities" :key="priority.value">
@@ -55,7 +72,7 @@
         </div>
 
         <div x-show="usesTaskFilters">
-            <label for="task-status" class="sr-only">Status</label>
+            <label for="task-status" class="{{ $labelClass }}">Status</label>
             <select id="task-status" x-model="filters.status" @change="applyFilters()" class="{{ $fieldClass }}">
                 <option value="">Semua Status</option>
                 <template x-for="status in config.statuses" :key="status.value">
@@ -63,18 +80,11 @@
                 </template>
             </select>
         </div>
-
-        <button
-            type="button"
-            @click="resetFilters()"
-            :disabled="!hasActiveFilters && sort === 'created_at' && direction === 'desc'"
-            class="rounded-lg border border-burgundy-200 px-4 py-2 text-sm font-medium text-burgundy-700 transition hover:bg-burgundy-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-            Reset Filter
-        </button>
     </div>
 
-    <div x-show="usesTaskFilters" class="flex flex-wrap items-end gap-3 border-t border-burgundy-50 pt-3">
+    <p x-show="usesTaskFilters" class="border-t border-burgundy-50 pt-3 text-xs font-semibold text-slate-600">Filter tanggal</p>
+
+    <div x-show="usesTaskFilters" class="-mt-1 flex flex-wrap items-end gap-3">
         <div>
             <label for="period-field" class="mb-1 block text-xs font-medium text-slate-500">Dasar tanggal</label>
             <select id="period-field" x-model="filters.date_field" @change="hasPeriod && applyFilters()" class="{{ $fieldClass }} w-auto">
@@ -145,5 +155,20 @@
         <p x-show="Object.keys(periodErrors).length" x-cloak class="w-full text-xs text-red-600" role="alert" x-text="Object.values(periodErrors)[0]?.[0]"></p>
 
         <p x-show="hasPeriod" x-cloak class="text-xs text-slate-500 lg:ml-auto">Tugas tanpa <span x-text="filters.date_field === 'start_date' ? 'tanggal mulai' : 'deadline'"></span> tidak termasuk hasil filter periode.</p>
+    </div>
+
+    <div x-show="activeFilterChips.length" x-cloak class="flex flex-wrap items-center gap-2 border-t border-burgundy-50 pt-3">
+        <span class="text-xs font-medium text-slate-500">Filter aktif:</span>
+        <template x-for="chip in activeFilterChips" :key="chip.key">
+            <button
+                type="button"
+                @click="removeFilter(chip.key)"
+                class="inline-flex items-center gap-1 rounded-full bg-burgundy-50 px-2.5 py-1 text-xs font-medium text-burgundy-800 ring-1 ring-burgundy-200 hover:bg-burgundy-100"
+                :aria-label="'Hapus filter ' + chip.label"
+            >
+                <span x-text="chip.label"></span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="size-3" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+        </template>
     </div>
 </form>

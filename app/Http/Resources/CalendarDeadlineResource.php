@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\TaskStatus;
 use Illuminate\Http\Request;
 
 /**
@@ -22,7 +21,6 @@ class CalendarDeadlineResource extends TaskResource
             ...parent::toArray($request),
             'task_id' => $this->id,
             'description' => $this->description,
-            'is_overdue' => $this->status !== TaskStatus::Done && $this->deadline->lt(today()),
         ];
     }
 }

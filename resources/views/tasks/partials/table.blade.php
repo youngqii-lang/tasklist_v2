@@ -40,10 +40,10 @@
                         <p class="text-sm font-semibold text-slate-900" x-text="task.title"></p>
                         <span class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
                     </div>
-                    <p class="mt-0.5 truncate text-xs text-slate-500" x-text="(task.division?.name ?? '—') + ' · ' + picNames(task)"></p>
+                    <p class="mt-0.5 truncate text-xs text-slate-500" x-text="(task.division?.name ?? '—') + (collaboratorBadge(task) ? ' ' + collaboratorBadge(task) : '') + ' · ' + picNames(task)"></p>
                     <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
                         <span class="rounded-md px-1.5 py-0.5 font-medium ring-1" :class="statusBadge(task.status)" x-text="task.status_label"></span>
-                        <span :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'" x-text="'Deadline ' + formatDate(task.deadline) + (task.is_overdue ? ' · Terlambat' : '')"></span>
+                        <span :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'" x-text="'Deadline ' + formatDeadline(task) + (task.is_overdue ? ' · Terlambat' : '')"></span>
                         <button x-show="task.abilities.transitions.length && !movingIds[task.id]" type="button" @click.stop="toggleTableMenu($event, task)" class="ml-auto rounded-md px-2 py-1 font-semibold text-burgundy-700 ring-1 ring-burgundy-200">Pindahkan</button>
                     </div>
                 </li>
@@ -90,14 +90,17 @@
                             <button type="button" @click="openTask(task.id)" class="line-clamp-2 text-left font-medium text-slate-900 hover:text-burgundy-700 hover:underline" x-text="task.title"></button>
                             <span x-show="task.evidences_count > 0" class="text-[11px] text-slate-500" x-text="task.evidences_count + ' evidence'"></span>
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap text-slate-600" x-text="task.division?.name"></td>
+                        <td class="px-4 py-3 whitespace-nowrap text-slate-600" :title="divisionNames(task)">
+                            <span x-text="task.division?.name"></span>
+                            <span x-show="collaboratorBadge(task)" class="ml-1 rounded bg-slate-100 px-1.5 py-px text-[10px] font-medium text-slate-600" x-text="collaboratorBadge(task)"></span>
+                        </td>
                         <td class="max-w-[12rem] truncate px-4 py-3 text-slate-600" x-text="picNames(task)" :title="picNames(task)"></td>
                         <td class="px-4 py-3">
                             <span class="rounded-md px-2 py-0.5 text-xs font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-slate-600" x-text="formatDate(task.start_date)"></td>
                         <td class="px-4 py-3 whitespace-nowrap" :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-600'">
-                            <span x-text="formatDate(task.deadline)"></span>
+                            <span x-text="formatDeadline(task)"></span>
                             <span x-show="task.is_overdue" class="block text-[11px]">Terlambat</span>
                         </td>
                         <td class="px-4 py-3">

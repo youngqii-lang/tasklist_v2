@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use Carbon\CarbonInterface;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /** PIC assignments live exclusively in task_assignments. */
 #[Fillable([
     'title', 'description', 'category_id', 'division_id', 'platform_id', 'creator_id', 'priority', 'status',
-    'start_date', 'deadline', 'requires_review', 'evidence_required', 'completed_at', 'deleted_by',
+    'start_date', 'deadline', 'deadline_time', 'requires_review', 'evidence_required', 'completed_at', 'deleted_by',
 ])]
 class Task extends Model
 {
@@ -26,12 +28,17 @@ class Task extends Model
 
     /**
      * Fields an Admin or the division's Manager may change through the edit form. PICs are changed through the
-     * assignment endpoint, not this form.
+     * assignment endpoint, not this form. Review and evidence are required for every task, so they are not editable.
      */
     public const EDITABLE_FIELDS = [
-        'title', 'description', 'category_id', 'division_id', 'platform_id', 'priority', 'status',
-        'start_date', 'deadline', 'requires_review',
+        'title', 'description', 'category_id', 'division_id', 'collaborating_division_ids', 'platform_id', 'priority',
+        'status', 'start_date', 'deadline', 'deadline_time',
     ];
+
+    /**
+     * The time a deadline without its own time ends at.
+     */
+    public const END_OF_DAY = '23:59';
 
     /**
      * @var array<string, mixed>
@@ -57,6 +64,33 @@ class Task extends Model
             'completed_at' => 'datetime',
             'version' => 'integer',
         ];
+    }
+
+    /**
+     * The deadline's time of day as HH:MM. It is stored as HH:MM:SS so it compares the same way on every database.
+     */
+    protected function deadlineTime(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => $value === null ? null : substr($value, 0, 5),
+            set: fn (?string $value) => $value === null || $value === '' ? null : substr($value, 0, 5).':00',
+        );
+    }
+
+    /**
+     * The moment the deadline ends: its date at its time, or at the end of that day when it has no time.
+     */
+    public function deadlineAt(): ?CarbonInterface
+    {
+        return $this->deadline?->copy()->setTimeFromTimeString($this->deadline_time ?? self::END_OF_DAY);
+    }
+
+    /**
+     * An unfinished task is overdue once the moment of its deadline has passed.
+     */
+    public function isOverdue(): bool
+    {
+        return $this->status !== TaskStatus::Done && $this->deadlineAt()?->isPast() === true;
     }
 
     /**
@@ -387,10 +421,6 @@ class Task extends Model
 
         if (! $this->forwardableBy($account)) {
             $locked['division_id'] = 'Hanya Admin dan Manajer yang dapat memindahkan tugas ke divisi lain.';
-        }
-
-        if ($this->status->inReview()) {
-            $locked['requires_review'] = 'Kewajiban review tidak dapat diubah setelah tugas masuk tahap review.';
         }
 
         return $locked;

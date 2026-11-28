@@ -52,7 +52,6 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="rounded-md px-2 py-0.5 text-xs font-medium ring-1" :class="statusBadge(task.status)" x-text="task.status_label"></span>
                         <span class="rounded-md px-2 py-0.5 text-xs font-semibold ring-1" :class="priorityBadge(task.priority)" x-text="task.priority_label"></span>
-                        <span x-show="task.requires_review" class="rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-200">Wajib QA</span>
                         <span x-show="task.is_overdue" class="rounded-md bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">Terlambat</span>
                     </div>
 
@@ -113,14 +112,21 @@
                                 <dd class="mt-0.5 whitespace-pre-line text-slate-800" x-text="task.description || 'Belum ada deskripsi.'" :class="!task.description && 'italic text-slate-400'"></dd>
                             </div>
                             <div><dt class="text-xs text-slate-500">Kategori/Jenis Tugas</dt><dd class="mt-0.5 text-slate-800" x-text="task.category?.name ?? '—'"></dd></div>
-                            <div><dt class="text-xs text-slate-500">Divisi</dt><dd class="mt-0.5 text-slate-800" x-text="task.division?.name ?? '—'"></dd></div>
+                            <div><dt class="text-xs text-slate-500">Divisi Penanggung Jawab</dt><dd class="mt-0.5 text-slate-800" x-text="task.division?.name ?? '—'"></dd></div>
+                            <div class="sm:col-span-2">
+                                <dt class="text-xs text-slate-500">Divisi Kolaborator</dt>
+                                <dd class="mt-1 flex flex-wrap gap-1.5">
+                                    <template x-for="division in task.collaborating_divisions ?? []" :key="division.id">
+                                        <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700" x-text="division.name"></span>
+                                    </template>
+                                    <span x-show="!(task.collaborating_divisions ?? []).length" class="text-sm text-slate-400 italic">Tidak ada</span>
+                                </dd>
+                            </div>
                             <div><dt class="text-xs text-slate-500">Platform</dt><dd class="mt-0.5 text-slate-800" x-text="task.platform?.name ?? '—'"></dd></div>
                             <div><dt class="text-xs text-slate-500">Prioritas</dt><dd class="mt-0.5 text-slate-800" x-text="task.priority_label"></dd></div>
                             <div><dt class="text-xs text-slate-500">Tanggal Mulai</dt><dd class="mt-0.5 text-slate-800" x-text="formatDate(task.start_date)"></dd></div>
-                            <div><dt class="text-xs text-slate-500">Deadline</dt><dd class="mt-0.5" :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-800'" x-text="formatDate(task.deadline)"></dd></div>
+                            <div><dt class="text-xs text-slate-500">Deadline</dt><dd class="mt-0.5" :class="task.is_overdue ? 'font-semibold text-red-600' : 'text-slate-800'" x-text="formatDeadline(task)"></dd></div>
                             <div><dt class="text-xs text-slate-500">Status</dt><dd class="mt-0.5 text-slate-800" x-text="task.status_label"></dd></div>
-                            <div><dt class="text-xs text-slate-500">Kewajiban QA</dt><dd class="mt-0.5 text-slate-800" x-text="task.requires_review ? 'Wajib diperiksa sebelum Done' : 'Tidak wajib'"></dd></div>
-                            <div><dt class="text-xs text-slate-500">Wajib Evidence</dt><dd class="mt-0.5 text-slate-800" x-text="task.evidence_required ? 'Ya' : 'Tidak'"></dd></div>
                             <div><dt class="text-xs text-slate-500">Dibuat oleh</dt><dd class="mt-0.5 text-slate-800" x-text="(task.creator?.fullname ?? '—') + ' · ' + formatDateTime(task.created_at)"></dd></div>
                             <div x-show="task.completed_at"><dt class="text-xs text-slate-500">Selesai</dt><dd class="mt-0.5 text-slate-800" x-text="formatDateTime(task.completed_at)"></dd></div>
                         </dl>
@@ -128,7 +134,15 @@
                         <section class="rounded-xl p-4 ring-1 ring-burgundy-100">
                             <div class="flex items-center justify-between gap-2">
                                 <h3 class="text-sm font-semibold text-slate-800">PIC</h3>
-                                <button x-show="task.abilities.assign && !assignment.open" type="button" @click="openAssignment()" class="text-xs font-semibold text-burgundy-700 hover:underline">Atur / Teruskan PIC</button>
+                                <button
+                                    x-show="task.abilities.assign && !assignment.open"
+                                    type="button"
+                                    @click="openAssignment()"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-burgundy-700 shadow-sm ring-1 ring-burgundy-300 transition hover:bg-burgundy-50 focus:outline-none focus:ring-2 focus:ring-burgundy-400"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>
+                                    Atur / Teruskan PIC
+                                </button>
                             </div>
                             <ul x-show="!assignment.open" class="mt-2 flex flex-wrap gap-2">
                                 <template x-for="pic in task.pics" :key="pic.id">
