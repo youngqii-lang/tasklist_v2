@@ -3,10 +3,9 @@ import { http } from '../http';
 import { matchesFilters, STATUS_LABELS } from './contract';
 import { addDays, formatting, parseDate, startOfWeek, toDateString } from './format';
 
-const MODE_DAYS = { weekly: 7, biweekly: 14 };
 const DAY_MS = 86400000;
-const dayFormatter = new Intl.DateTimeFormat('id-ID', { weekday: 'short' });
-const rangeFormatter = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+const monthNames = Array.from({ length: 12 }, (_, index) =>
+    new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, index, 1)));
 
 /**
  * Spread items over as few rows as possible: an item goes into the first row where it does not overlap the previous one.
@@ -37,15 +36,16 @@ export function packLanes(items) {
 }
 
 /**
- * Read-only weekly or two-weekly timeline of tasks and shared events across divisions.
+ * Read-only monthly timeline of tasks and shared events across divisions, laid out like the Calendar: one row per
+ * week, with each item drawn as a bar from its start date to its deadline (or end) inside every week it touches.
  */
 export default (config, filters = {}) => ({
     ...formatting,
     config,
     filters: { ...filters },
-    mode: 'weekly',
-    from: startOfWeek(new Date()),
-    compact: true,
+    month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    weekdays: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+    monthNames,
     tasks: [],
     events: [],
     loading: true,
@@ -57,32 +57,29 @@ export default (config, filters = {}) => ({
         this.load();
     },
 
+    /** The Monday on or before the first day of the month: the first day in the grid. */
+    get from() {
+        return startOfWeek(this.month);
+    },
+
+    /** Whole weeks from that Monday until the month's last day. */
     get dayCount() {
-        return MODE_DAYS[this.mode];
+        const last = new Date(this.month.getFullYear(), this.month.getMonth() + 1, 0);
+
+        return Math.ceil((Math.round((last - this.from) / DAY_MS) + 1) / 7) * 7;
     },
 
-    get days() {
-        const today = toDateString(new Date());
+    get yearOptions() {
+        const current = new Date().getFullYear();
+        const years = Array.from({ length: 7 }, (_, index) => current - 3 + index);
 
-        return Array.from({ length: this.dayCount }, (_, index) => {
-            const date = addDays(this.from, index);
-
-            return {
-                key: toDateString(date),
-                weekday: dayFormatter.format(date),
-                day: date.getDate(),
-                isToday: toDateString(date) === today,
-                isWeekend: date.getDay() === 0 || date.getDay() === 6,
-            };
-        });
+        return years.includes(this.month.getFullYear()) ? years : [...years, this.month.getFullYear()].sort();
     },
 
-    get periodLabel() {
-        return `${rangeFormatter.format(this.from)} – ${rangeFormatter.format(addDays(this.from, this.dayCount - 1))}`;
-    },
+    get isCurrentMonth() {
+        const now = new Date();
 
-    get gridStyle() {
-        return `grid-template-columns: repeat(${this.dayCount}, minmax(0, 1fr));`;
+        return this.month.getFullYear() === now.getFullYear() && this.month.getMonth() === now.getMonth();
     },
 
     /** Tasks passing the Tasklist filters; the shared agenda always shows. */
@@ -98,24 +95,60 @@ export default (config, filters = {}) => ({
         return this.visibleTasks.length === 0 && this.events.length === 0;
     },
 
-    get includesToday() {
-        return this.days.some((day) => day.isToday);
-    },
-
     get overdueCount() {
         return this.visibleTasks.filter((task) => task.isOverdue).length;
     },
 
-    /** Rows of task bars: packed together in compact mode, one task per row otherwise. */
-    get taskLanes() {
-        return this.compact ? packLanes(this.visibleTasks) : this.visibleTasks.map((task) => [task]);
+    /** One row per week: its seven days, and the agenda and task bars clipped to that week and packed into lanes. */
+    get weeks() {
+        const today = toDateString(new Date());
+
+        return Array.from({ length: this.dayCount / 7 }, (_, week) => {
+            const first = week * 7;
+            const days = Array.from({ length: 7 }, (__, offset) => {
+                const date = addDays(this.from, first + offset);
+                const key = toDateString(date);
+
+                return {
+                    key,
+                    day: date.getDate(),
+                    inMonth: date.getMonth() === this.month.getMonth(),
+                    isToday: key === today,
+                    isWeekend: date.getDay() === 0 || date.getDay() === 6,
+                };
+            });
+
+            return {
+                key: days[0].key,
+                days,
+                eventLanes: packLanes(this.inWeek(this.events, first)),
+                taskLanes: packLanes(this.inWeek(this.visibleTasks, first)),
+            };
+        });
     },
 
-    get eventLanes() {
-        return this.compact ? packLanes(this.events) : this.events.map((event) => [event]);
+    /** The items that touch the week starting at the given day index, placed on that week's seven columns. */
+    inWeek(items, first) {
+        const last = first + 6;
+
+        return items
+            .filter((item) => item.rawStart <= last && item.rawEnd >= first)
+            .map((item) => {
+                const startIndex = Math.max(item.rawStart, first) - first;
+                const endIndex = Math.min(item.rawEnd, last) - first;
+
+                return {
+                    ...item,
+                    startIndex,
+                    endIndex,
+                    continuesBefore: item.rawStart < first,
+                    continuesAfter: item.rawEnd > last,
+                    gridStyle: `grid-column: ${startIndex + 1} / ${endIndex + 2}; grid-row: 1;`,
+                };
+            });
     },
 
-    /** Only the division is sent to the API; search, priority and status are applied to the loaded period. */
+    /** Only the division is sent to the API; search, priority and status are applied to the loaded month. */
     onFiltersChanged(filters) {
         const divisionChanged = filters.division !== this.filters.division;
         this.filters = { ...filters };
@@ -123,26 +156,18 @@ export default (config, filters = {}) => ({
         if (divisionChanged) this.load();
     },
 
-    setMode(mode) {
-        this.mode = mode;
+    jumpToMonth(monthIndex, year) {
+        this.month = new Date(Number(year), Number(monthIndex), 1);
         this.load();
     },
 
-    shift(direction) {
-        this.from = addDays(this.from, direction * this.dayCount);
+    shiftMonth(direction) {
+        this.month = new Date(this.month.getFullYear(), this.month.getMonth() + direction, 1);
         this.load();
     },
 
     goToToday() {
-        this.from = startOfWeek(new Date());
-        this.load();
-    },
-
-    /** Jump to the week that contains the picked date. */
-    goToDate(value) {
-        if (!value) return;
-
-        this.from = startOfWeek(parseDate(value));
+        this.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         this.load();
     },
 
@@ -150,6 +175,7 @@ export default (config, filters = {}) => ({
         const ticket = ++this.ticket;
         this.loading = true;
         this.error = null;
+        this.selectedEvent = null;
 
         try {
             // GET /api/tasks/schedule returns tasks and agenda in one list, told apart by type.
@@ -166,7 +192,7 @@ export default (config, filters = {}) => ({
             this.tasks = data.filter((item) => item.type === 'task').map((item) => {
                 const { start, end } = span(item);
 
-                return this.withPlacement({
+                return this.withPosition({
                     ...item,
                     id: item.task_id ?? item.id,
                     division: item.division ?? { name: '—' },
@@ -176,7 +202,7 @@ export default (config, filters = {}) => ({
                     isOverdue: item.is_overdue ?? (item.status !== 'done' && end < today),
                 });
             });
-            this.events = data.filter((item) => item.type === 'event').map((item) => this.withPlacement({ ...item, ...span(item) }));
+            this.events = data.filter((item) => item.type === 'event').map((item) => this.withPosition({ ...item, ...span(item) }));
         } catch (error) {
             if (ticket === this.ticket) this.error = error.message;
         } finally {
@@ -184,22 +210,11 @@ export default (config, filters = {}) => ({
         }
     },
 
-    /** Work out once where an item sits on the grid, clipped to the visible period. */
-    withPlacement(item) {
+    /** Day positions of the item's first and last day, counted from the first day in the grid. */
+    withPosition(item) {
         const dayIndex = (value) => Math.round((parseDate(value) - this.from) / DAY_MS);
-        const rawStart = dayIndex(item.start);
-        const rawEnd = dayIndex(item.end);
-        const startIndex = Math.max(0, rawStart);
-        const endIndex = Math.min(this.dayCount - 1, rawEnd);
 
-        return {
-            ...item,
-            startIndex,
-            endIndex,
-            continuesBefore: rawStart < 0,
-            continuesAfter: rawEnd > this.dayCount - 1,
-            gridStyle: `grid-column: ${startIndex + 1} / ${endIndex + 2}; grid-row: 1;`,
-        };
+        return { ...item, rawStart: dayIndex(item.start), rawEnd: dayIndex(item.end) };
     },
 
     taskTitle(task) {
