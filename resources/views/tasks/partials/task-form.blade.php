@@ -109,8 +109,9 @@
 
                 <fieldset x-show="options && canEdit('collaborating_division_ids')" class="sm:col-span-2">
                     <legend class="{{ $labelClass }}">Divisi Kolaborator</legend>
-                    <p class="text-xs text-slate-500">Divisi PIC otomatis ikut. Tambahkan divisi lain yang juga terlibat bila perlu.</p>
-                    <p x-show="!form.division_id" class="mt-2 text-xs text-slate-500">Pilih divisi penanggung jawab terlebih dahulu.</p>
+                    <p class="text-xs text-slate-500">
+                        Divisi PIC otomatis ikut. Tambahkan divisi lain yang juga terlibat bila perlu<span x-show="!form.division_id">, setelah memilih divisi penanggung jawab</span>.
+                    </p>
                     <div x-show="form.division_id" class="mt-2 flex flex-wrap gap-2">
                         <template x-for="division in collaboratorChoices" :key="division.id">
                             <label

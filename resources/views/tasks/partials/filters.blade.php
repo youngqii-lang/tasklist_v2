@@ -9,7 +9,7 @@
         <h2 class="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-burgundy-600" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
             Filter
-            <span x-show="activeFilterChips.length" x-cloak class="rounded-full bg-burgundy-600 px-2 py-0.5 text-[10px] font-semibold text-white" x-text="activeFilterChips.length + ' aktif'"></span>
+            <span x-show="activeFilterCount" x-cloak class="rounded-full bg-burgundy-600 px-2 py-0.5 text-[10px] font-semibold text-white" x-text="activeFilterCount + ' aktif'"></span>
         </h2>
         <button
             type="button"
@@ -157,18 +157,4 @@
         <p x-show="hasPeriod" x-cloak class="text-xs text-slate-500 lg:ml-auto">Tugas tanpa <span x-text="filters.date_field === 'start_date' ? 'tanggal mulai' : 'deadline'"></span> tidak termasuk hasil filter periode.</p>
     </div>
 
-    <div x-show="activeFilterChips.length" x-cloak class="flex flex-wrap items-center gap-2 border-t border-burgundy-50 pt-3">
-        <span class="text-xs font-medium text-slate-500">Filter aktif:</span>
-        <template x-for="chip in activeFilterChips" :key="chip.key">
-            <button
-                type="button"
-                @click="removeFilter(chip.key)"
-                class="inline-flex items-center gap-1 rounded-full bg-burgundy-50 px-2.5 py-1 text-xs font-medium text-burgundy-800 ring-1 ring-burgundy-200 hover:bg-burgundy-100"
-                :aria-label="'Hapus filter ' + chip.label"
-            >
-                <span x-text="chip.label"></span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="size-3" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-            </button>
-        </template>
-    </div>
 </form>

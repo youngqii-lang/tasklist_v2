@@ -96,48 +96,11 @@ export default (config) => ({
         return Object.entries(this.filters).some(([key, value]) => !['date_field', 'scope'].includes(key) && value !== '');
     },
 
-    /** The active filters as removable chips, in the order of the filter fields. */
-    get activeFilterChips() {
-        if (!this.usesTaskFilters) return [];
+    /** How many filters narrow the list: each basic filter and the period count once. */
+    get activeFilterCount() {
+        if (!this.usesTaskFilters) return 0;
 
-        const filters = this.filters;
-        const chips = [];
-        const optionLabel = (options, value) => options.find((option) => option.value === value)?.label ?? value;
-
-        if (filters.search) chips.push({ key: 'search', label: `Judul: "${filters.search}"` });
-        if (filters.division) chips.push({ key: 'division', label: `Divisi: ${this.divisionName(filters.division)}` });
-        if (filters.pic_id) {
-            const pic = this.meta.pics.find((option) => String(option.id) === String(filters.pic_id));
-            chips.push({ key: 'pic_id', label: `PIC: ${pic?.fullname ?? 'Terpilih'}` });
-        }
-        if (filters.priority) chips.push({ key: 'priority', label: `Prioritas: ${optionLabel(this.config.priorities, filters.priority)}` });
-        if (filters.status) chips.push({ key: 'status', label: `Status: ${optionLabel(this.config.statuses, filters.status)}` });
-        if (filters.filter_mode) chips.push({ key: 'period', label: `${filters.date_field === 'start_date' ? 'Tanggal mulai' : 'Deadline'}: ${this.periodLabel()}` });
-
-        return chips;
-    },
-
-    /** The active period in words, for its chip. */
-    periodLabel() {
-        const filters = this.filters;
-
-        return {
-            date: () => this.formatDate(filters.date),
-            month: () => `${monthNames[Number(filters.month) - 1] ?? filters.month} ${filters.year}`,
-            year: () => filters.year,
-            range: () => `${this.formatDate(filters.start_date)} – ${this.formatDate(filters.end_date)}`,
-        }[filters.filter_mode]?.() ?? '';
-    },
-
-    removeFilter(key) {
-        if (key === 'period') {
-            this.setPeriodMode('');
-
-            return;
-        }
-
-        this.filters[key] = '';
-        this.applyFilters();
+        return BASIC_FILTER_KEYS.filter((key) => this.filters[key] !== '').length + (this.filters.filter_mode ? 1 : 0);
     },
 
     get isMyTasks() {

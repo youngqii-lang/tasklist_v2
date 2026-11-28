@@ -35,21 +35,7 @@
             @endif
         </div>
 
-        <nav class="mt-6 flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-burgundy-100" aria-label="Tampilan Tasklist">
-            @foreach (['board' => 'Board', 'table' => 'Table', 'timeline' => 'Timeline', 'calendar' => 'Calendar'] as $view => $label)
-                <button
-                    type="button"
-                    @click="setView('{{ $view }}')"
-                    :class="view === '{{ $view }}' ? 'bg-burgundy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-burgundy-50 hover:text-burgundy-800'"
-                    :aria-current="view === '{{ $view }}' ? 'page' : null"
-                    class="flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition"
-                >
-                    {{ $label }}
-                </button>
-            @endforeach
-        </nav>
-
-        <div class="mt-4 flex flex-wrap items-center gap-3">
+        <div class="mt-6 flex flex-wrap items-center gap-3">
             <div class="inline-flex rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-burgundy-100" role="group" aria-label="Cakupan tugas">
                 @foreach (['' => 'Semua Tugas', 'my_tasks' => 'Tugas Saya'] as $scope => $label)
                     <button
@@ -63,6 +49,20 @@
             </div>
             <p class="text-xs text-slate-500" x-text="isMyTasks ? 'Tugas dengan Anda sebagai PIC aktif.' : 'Seluruh tugas lintas divisi. Tugas di luar kewenangan Anda hanya dapat dilihat.'"></p>
         </div>
+
+        <nav class="mt-4 flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-burgundy-100" aria-label="Tampilan Tasklist">
+            @foreach (['board' => 'Board', 'table' => 'Table', 'timeline' => 'Timeline', 'calendar' => 'Calendar'] as $view => $label)
+                <button
+                    type="button"
+                    @click="setView('{{ $view }}')"
+                    :class="view === '{{ $view }}' ? 'bg-burgundy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-burgundy-50 hover:text-burgundy-800'"
+                    :aria-current="view === '{{ $view }}' ? 'page' : null"
+                    class="flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition"
+                >
+                    {{ $label }}
+                </button>
+            @endforeach
+        </nav>
 
         @include('tasks.partials.filters')
 
